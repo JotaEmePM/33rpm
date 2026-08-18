@@ -7,9 +7,13 @@
     "dev": "lerna run dev --parallel",
     "build": "lerna run build",
     "lint": "lerna run lint",
+    "lint:fix": "lerna run lint:fix",
+    "format": "biome format --write .",
+    "check": "biome check --write .",
     "clean": "lerna clean -y"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.9",
     "lerna": "^10.0.0"
   }
 }
