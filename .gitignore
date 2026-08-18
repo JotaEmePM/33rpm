@@ -1,0 +1,12 @@
+node_modules
+dist
+.DS_Store
+*.log
+
+# Nx / Lerna cache
+.nx/cache
+.nx/workspace-data
+
+# Local env
+.env
+.env.local
