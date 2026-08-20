@@ -33,7 +33,12 @@ export interface Order {
   id: string
   customerName: string
   customerEmail: string
+  phone: string
   shippingMethod: ShippingMethod
+  /** Sólo con despacho; en retiro llegan vacíos. */
+  address: string | null
+  city: string | null
+  region: string | null
   subtotal: number
   shippingCost: number
   total: number
@@ -64,6 +69,19 @@ export function fetchOrder(id: string, signal?: AbortSignal): Promise<Order> {
 }
 
 /** Solo para administración: el API exige rol admin. */
+export const ORDER_STATUSES = ["pendiente", "pagado", "enviado", "anulado"] as const
+
+export type OrderStatus = (typeof ORDER_STATUSES)[number]
+
+/** Cambia el estado del pedido. Sólo administración. */
+export function updateOrderStatus(id: string, status: OrderStatus): Promise<Order> {
+  return request<Order>(`/api/orders/${encodeURIComponent(id)}/estado`, {
+    method: "PATCH",
+    body: { status },
+    auth: true,
+  })
+}
+
 export function fetchOrders(signal?: AbortSignal): Promise<{ items: Order[] }> {
   return request<{ items: Order[] }>("/api/orders", { signal, auth: true })
 }

@@ -3,6 +3,7 @@ import { NavLink } from "react-router"
 
 const TABS = [
   { to: "/admin/productos", label: "Productos" },
+  { to: "/admin/pedidos", label: "Pedidos" },
   { to: "/admin/productos/nuevo", label: "Nuevo disco" },
   { to: "/admin/fotos", label: "Fotos" },
 ]

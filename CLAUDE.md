@@ -68,6 +68,7 @@ pnpm --dir packages/frontend lint:oxlint
 - La ficha muestra la galería (`ReleaseGallery`): miniaturas al costado y flechas sobre la foto, sin zoom. En catálogo y buscador se usa `images[0]`, que el API garantiza que es la portada.
 - El panel sube las fotos desde `ImageManager`, que redimensiona a 1600 px y las convierte a WebP antes de enviarlas. `/admin/fotos` lista los discos sin foto —los que entran por CSV llegan así— para cargarlas de corrido.
 - El carrusel de la portada muestra los **destacados**; si no hay ninguno marcado cae a los discos más recientes, para que la portada nunca quede sin sección.
+- `/admin/pedidos` lista los pedidos con su estado de cobro, deja cambiar el estado del pedido y despliega cada uno con sus discos, teléfono y dirección. El listado del API devuelve **como mucho 50** (`listOrders`), que es lo que hay hasta que haga falta paginar.
 - El panel avisa antes de ocultar o borrar: al subir un CSV compara con el catálogo y, si faltan discos que hoy se ven o alguna fila trae `-2`, pide confirmación y los lista en vez de aplicarlo de una.
 - El CSV del panel se arma y se lee en el cliente (`lib/csv.ts` para el formato, `lib/catalog-csv.ts` para las columnas en español). Lleva BOM porque si no Excel destroza los acentos, y al leer detecta si el separador es coma, punto y coma o tabulador.
 - Tailwind v4 **sin `tailwind.config`**: los tokens (`ink`, `paper`, `volt`, `font-display`…) se declaran en `@theme` dentro de `src/index.css`.

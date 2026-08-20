@@ -2,6 +2,7 @@ import type { RouteObject } from "react-router"
 import { RequireAdmin } from "../components/auth/RequireAdmin"
 import { Layout } from "../components/layout/Layout"
 import { RouteError } from "../components/RouteError"
+import { AdminOrdersPage } from "../pages/admin/AdminOrdersPage"
 import { AdminProductsPage } from "../pages/admin/AdminProductsPage"
 import { EditProductPage } from "../pages/admin/EditProductPage"
 import { NewProductPage } from "../pages/admin/NewProductPage"
@@ -62,6 +63,14 @@ export const routes: RouteObject[] = [
         element: (
           <RequireAdmin>
             <EditProductPage />
+          </RequireAdmin>
+        ),
+      },
+      {
+        path: "admin/pedidos",
+        element: (
+          <RequireAdmin>
+            <AdminOrdersPage />
           </RequireAdmin>
         ),
       },
