@@ -30,20 +30,28 @@ export interface AlbumInfo {
  * https://www.last.fm/music/Radiohead/In+Rainbows
  */
 export function parseAlbumUrl(raw: string): { artist: string; album: string } {
+  const text = raw.trim()
+
   let url: URL
   try {
-    url = new URL(raw.trim())
+    // Pegar la dirección sin "https://" es lo normal al copiar de la barra.
+    url = new URL(/^https?:\/\//i.test(text) ? text : `https://${text}`)
   } catch {
-    throw new ValidationError(["La URL de Last.fm no es válida"])
+    throw new ValidationError([`La URL de Last.fm no es válida: ${text}`])
   }
 
   if (!/(^|\.)last\.fm$/.test(url.hostname)) {
-    throw new ValidationError(["La URL debe ser de last.fm"])
+    throw new ValidationError([`La URL debe ser de last.fm: ${text}`])
   }
 
-  const [music, artist, album] = url.pathname.split("/").filter(Boolean)
-  if (music !== "music" || !artist || !album) {
-    throw new ValidationError(["La URL debe apuntar a un álbum: /music/Artista/Album"])
+  // Last.fm antepone el idioma cuando se navega en español: /es/music/...
+  const parts = url.pathname.split("/").filter(Boolean)
+  const start = parts.indexOf("music")
+  const artist = parts[start + 1]
+  const album = parts[start + 2]
+
+  if (start === -1 || !artist || !album) {
+    throw new ValidationError([`La URL debe apuntar a un álbum (/music/Artista/Album): ${text}`])
   }
 
   // Last.fm escribe los espacios como "+" dentro del path.
