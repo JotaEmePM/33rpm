@@ -72,6 +72,15 @@ export const CATALOG_SCHEMA_SQL = `
 
     CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
 
+    CREATE TABLE IF NOT EXISTS wishlist (
+      user_id TEXT NOT NULL,
+      release_id TEXT NOT NULL REFERENCES releases(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (user_id, release_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_wishlist_user ON wishlist(user_id);
+
     CREATE TABLE IF NOT EXISTS subscribers (
       email TEXT PRIMARY KEY,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))

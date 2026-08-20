@@ -1,6 +1,7 @@
 import { useRef } from "react"
 import { Link, useLoaderData } from "react-router"
 import { ReleaseCard } from "../components/catalog/ReleaseCard"
+import { WishlistButton } from "../components/catalog/WishlistButton"
 import { AddToCartPanel } from "../components/product/AddToCartPanel"
 import { ReleaseGallery } from "../components/product/ReleaseGallery"
 import { ReleaseMeta } from "../components/product/ReleaseMeta"
@@ -56,7 +57,14 @@ export function ProductPage() {
             </h1>
           </div>
 
-          <AddToCartPanel release={release} sleeveRef={sleeveRef} />
+          <div className="flex flex-col gap-3">
+            <AddToCartPanel release={release} sleeveRef={sleeveRef} />
+            <WishlistButton
+              release={release}
+              withLabel
+              className="self-start border-2 border-ash"
+            />
+          </div>
           <Tracklist tracks={release.tracklist} />
         </div>
       </div>

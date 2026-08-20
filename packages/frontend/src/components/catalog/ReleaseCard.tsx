@@ -6,6 +6,7 @@ import type { Release } from "../../types"
 import { Badge } from "../ui/Badge"
 import { Price } from "../ui/Price"
 import { Sleeve } from "../ui/Sleeve"
+import { WishlistButton } from "./WishlistButton"
 
 interface ReleaseCardProps {
   release: Release
@@ -35,9 +36,13 @@ export function ReleaseCard({ release, animated = false }: ReleaseCardProps) {
 
   return (
     <article
-      className="flex flex-col gap-3 border-b border-r border-ash p-4"
+      className="relative flex flex-col gap-3 border-b border-r border-ash p-4"
       style={animated ? { viewTransitionName: `card-${release.id}` } : undefined}
     >
+      <WishlistButton
+        release={release}
+        className="absolute right-4 top-4 z-10 bg-ink/70 !px-2 backdrop-blur-sm"
+      />
       <Link to={to} viewTransition className="group flex flex-col gap-3">
         <div className="relative">
           <Sleeve

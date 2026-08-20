@@ -136,6 +136,38 @@ export async function listReleases(
   }
 }
 
+/**
+ * Discos concretos por id, en el orden que se pidan. La lista de deseos guarda
+ * ids sueltos y necesita reconstruirlos con su portada.
+ */
+export async function listReleasesByIds(
+  ids: string[],
+  { includeHidden = false } = {},
+  on?: Executor,
+): Promise<Release[]> {
+  if (ids.length === 0) return []
+
+  const placeholders = ids.map(() => "?").join(", ")
+  const rows = await all<ReleaseRow>(
+    `SELECT * FROM releases WHERE id IN (${placeholders}) ${includeHidden ? "" : "AND visible = 1"}`,
+    ids,
+    on,
+  )
+
+  const found = rows.map((row) => row.id)
+  const [tracks, covers] = await Promise.all([
+    tracksFor(found, on),
+    imagesFor(found, { onlyPrimary: true }, on),
+  ])
+
+  const byId = new Map(
+    rows.map((row) => [row.id, toRelease(row, tracks.get(row.id) ?? [], covers.get(row.id) ?? [])]),
+  )
+  return ids
+    .map((id) => byId.get(id))
+    .filter((release): release is Release => release !== undefined)
+}
+
 export async function getRelease(id: string, on?: Executor): Promise<Release | null> {
   const row = await one<ReleaseRow>("SELECT * FROM releases WHERE id = ?", [id], on)
   if (!row) return null
@@ -223,15 +255,17 @@ export async function updateRelease(
 }
 
 /**
- * Borra el disco y sus pistas. El `ON DELETE CASCADE` sólo actúa con las claves
- * foráneas activas, y en el SQLite local vienen apagadas: se hace a mano para
- * que el resultado sea el mismo contra Turso que contra un archivo.
+ * Borra el disco con sus pistas, sus fotos y las marcas de lista de deseos. El
+ * `ON DELETE CASCADE` sólo actúa con las claves foráneas activas, y en el
+ * SQLite local vienen apagadas: se hace a mano para que el resultado sea el
+ * mismo contra Turso que contra un archivo.
  */
 export async function deleteRelease(id: string, on?: Executor): Promise<ReleaseImage[] | null> {
   if (!on) return transaction((tx) => deleteRelease(id, tx))
 
   const images = await removeImagesOf(id, on)
   await run("DELETE FROM tracks WHERE release_id = ?", [id], on)
+  await run("DELETE FROM wishlist WHERE release_id = ?", [id], on)
   const deleted = await run("DELETE FROM releases WHERE id = ?", [id], on)
   return deleted > 0 ? images : null
 }

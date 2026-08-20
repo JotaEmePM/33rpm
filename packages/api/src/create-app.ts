@@ -16,6 +16,7 @@ import { metaRouter } from "./routes/meta.js"
 import { newsletterRouter } from "./routes/newsletter.js"
 import { ordersRouter } from "./routes/orders.js"
 import { releasesRouter } from "./routes/releases.js"
+import { wishlistRouter } from "./routes/wishlist.js"
 
 /**
  * Monta seguridad, auth y rutas sobre la app que reciba. Quien la crea es
@@ -51,6 +52,7 @@ export function configureApp(app: Express): Express {
   app.use("/api/orders", ordersRouter)
   app.use("/api/meta", metaRouter)
   app.use("/api/newsletter", newsletterRouter)
+  app.use("/api/lista-deseos", wishlistRouter)
 
   app.use(notFound)
   app.use(errorHandler)

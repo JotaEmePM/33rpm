@@ -13,6 +13,7 @@ import { HomePage } from "../pages/HomePage"
 import { LoginPage } from "../pages/LoginPage"
 import { NotFoundPage } from "../pages/NotFoundPage"
 import { ProductPage } from "../pages/ProductPage"
+import { WishlistPage } from "../pages/WishlistPage"
 import { catalogLoader, releaseLoader } from "./loaders"
 
 /** El árbol vive aparte para poder montarlo también en un memory router. */
@@ -36,6 +37,7 @@ export const routes: RouteObject[] = [
       },
       { path: "login", element: <LoginPage /> },
       { path: "carrito", element: <CartPage /> },
+      { path: "lista-deseos", element: <WishlistPage /> },
       { path: "checkout", element: <CheckoutPage /> },
       {
         path: "admin/productos",

@@ -3,14 +3,17 @@
 import { RouterProvider } from "react-router/dom"
 import { CartProvider } from "./context/CartProvider"
 import { FlyToCartProvider } from "./context/FlyToCartProvider"
+import { WishlistProvider } from "./context/WishlistProvider"
 import { router } from "./router"
 
 function App() {
   return (
     <CartProvider>
-      <FlyToCartProvider>
-        <RouterProvider router={router} />
-      </FlyToCartProvider>
+      <WishlistProvider>
+        <FlyToCartProvider>
+          <RouterProvider router={router} />
+        </FlyToCartProvider>
+      </WishlistProvider>
     </CartProvider>
   )
 }

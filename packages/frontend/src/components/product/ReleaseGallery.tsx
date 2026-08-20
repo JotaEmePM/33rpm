@@ -1,5 +1,7 @@
 import { type Ref, useState } from "react"
 import type { Release } from "../../types"
+import { ArrowLeftIcon } from "../icons/ArrowLeftIcon"
+import { ArrowRightIcon } from "../icons/ArrowRightIcon"
 import { Sleeve } from "../ui/Sleeve"
 
 interface ReleaseGalleryProps {
@@ -59,17 +61,17 @@ export function ReleaseGallery({ release, sleeveRef }: ReleaseGalleryProps) {
               type="button"
               onClick={() => move(-1)}
               aria-label="Foto anterior"
-              className="absolute left-0 top-1/2 flex size-11 -translate-y-1/2 items-center justify-center bg-ink/80 text-2xl text-paper transition-colors hover:bg-volt hover:text-ink"
+              className="absolute left-0 top-1/2 flex size-11 -translate-y-1/2 items-center justify-center bg-ink/80 text-paper transition-colors hover:bg-volt hover:text-ink"
             >
-              ‹
+              <ArrowLeftIcon className="size-5" />
             </button>
             <button
               type="button"
               onClick={() => move(1)}
               aria-label="Foto siguiente"
-              className="absolute right-0 top-1/2 flex size-11 -translate-y-1/2 items-center justify-center bg-ink/80 text-2xl text-paper transition-colors hover:bg-volt hover:text-ink"
+              className="absolute right-0 top-1/2 flex size-11 -translate-y-1/2 items-center justify-center bg-ink/80 text-paper transition-colors hover:bg-volt hover:text-ink"
             >
-              ›
+              <ArrowRightIcon className="size-5" />
             </button>
             <p className="label absolute bottom-0 right-0 bg-ink/80 px-2 py-1 text-muted">
               {index + 1}/{images.length}

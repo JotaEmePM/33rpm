@@ -2,6 +2,7 @@ import { Link, NavLink } from "react-router"
 import { AccountButton } from "./AccountButton"
 import { CartButton } from "./CartButton"
 import { SearchField } from "./SearchField"
+import { WishlistLink } from "./WishlistLink"
 
 const NAV = [
   { to: "/catalogo", label: "Catálogo" },
@@ -42,6 +43,7 @@ export function Header() {
 
         <div className="flex items-center gap-3 border-l-0 px-3 py-2 sm:border-l-2 sm:border-paper">
           <SearchField className="hidden lg:flex lg:w-80 xl:w-[28rem]" />
+          <WishlistLink />
           <AccountButton />
           <CartButton />
         </div>
