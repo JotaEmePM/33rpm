@@ -6,7 +6,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://33rpm-api.vercel.app/api/:path*"
+      "destination": "https://33rpm-api-jotaemepms-projects.vercel.app/api/:path*"
     },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
