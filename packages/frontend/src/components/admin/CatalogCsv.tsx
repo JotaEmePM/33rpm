@@ -99,8 +99,9 @@ export function CatalogCsv({ releases, onImported }: CatalogCsvProps) {
           <p className="label text-volt">Inventario en CSV</p>
           <p className="mt-1 text-sm text-muted">
             Descarga el catálogo, edítalo en tu planilla y vuelve a subirlo. El archivo es la foto
-            completa de la tienda: las filas con <strong className="text-paper">id vacío</strong> se
-            dan de alta, una celda en blanco deja ese dato como está, y{" "}
+            completa de la tienda: las filas con un{" "}
+            <strong className="text-paper">id que aún no exista</strong> —o sin id— se dan de alta,
+            las demás actualizan lo que traigan, una celda en blanco deja ese dato como está, y{" "}
             <strong className="text-paper">un disco que ya no aparezca deja de mostrarse</strong>.
             Para ocultar uno sin sacarlo del archivo, pon <strong className="text-paper">-1</strong>{" "}
             en su stock o <strong className="text-paper">no</strong> en la columna visible;{" "}

@@ -275,6 +275,19 @@ export async function deleteRelease(id: string, on?: Executor): Promise<ReleaseI
   return deleted > 0 ? images : null
 }
 
+/** Cuáles de esos ids ya están en el catálogo, en una sola consulta. */
+export async function existingReleaseIds(ids: string[], on?: Executor): Promise<Set<string>> {
+  if (ids.length === 0) return new Set()
+
+  const placeholders = ids.map(() => "?").join(", ")
+  const rows = await all<{ id: string }>(
+    `SELECT id FROM releases WHERE id IN (${placeholders})`,
+    ids,
+    on,
+  )
+  return new Set(rows.map((row) => row.id))
+}
+
 export async function releaseExists(id: string, on?: Executor): Promise<boolean> {
   return (await one("SELECT 1 FROM releases WHERE id = ?", [id], on)) !== null
 }

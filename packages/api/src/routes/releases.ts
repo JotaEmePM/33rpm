@@ -17,6 +17,7 @@ import { addImage, listImages, removeImage, setPrimaryImage } from "../repositor
 import {
   createRelease,
   deleteRelease,
+  existingReleaseIds,
   getRelease,
   hideMissing,
   listReleases,
@@ -213,9 +214,22 @@ releasesRouter.post("/importar", writeRateLimit, requireAdmin, async (req, res) 
 
   const issues: string[] = []
   const updates: { id: string; changes: Partial<Release>; where: string; cover?: string }[] = []
-  const creations: { draft: Omit<Release, "id">; where: string; cover?: string }[] = []
+  const creations: {
+    id?: string
+    draft: Omit<Release, "id">
+    where: string
+    cover?: string
+  }[] = []
   const deletions: { id: string; where: string }[] = []
   const seen = new Set<string>()
+
+  // Un id que todavía no está en el catálogo es un alta, no un error: el
+  // archivo sirve igual para dar de alta que para corregir precios y stock.
+  const known = await existingReleaseIds(
+    rows
+      .map((entry: ImportRow) => (typeof entry?.id === "string" ? slugify(entry.id) : ""))
+      .filter(Boolean),
+  )
 
   rows.forEach((entry: ImportRow, index: number) => {
     // La cabecera ocupa la línea 1: sin número propio, la primera fila es la 2.
@@ -226,8 +240,10 @@ releasesRouter.post("/importar", writeRateLimit, requireAdmin, async (req, res) 
       return
     }
 
-    const id = typeof entry.id === "string" ? entry.id.trim() : ""
-    const isNewRow = id.length === 0
+    // Los ids se normalizan como los que genera la tienda, para que un archivo
+    // escrito a mano no cree duplicados por una mayúscula o un espacio.
+    const id = typeof entry.id === "string" ? slugify(entry.id) : ""
+    const isNewRow = id.length === 0 || !known.has(id)
 
     // -2 borra el disco del catálogo. Es lo único que no se puede deshacer, así
     // que sólo se admite sobre una fila que ya tenga id.
@@ -257,7 +273,15 @@ releasesRouter.post("/importar", writeRateLimit, requireAdmin, async (req, res) 
       ) as Partial<Release>
 
       if (isNewRow) {
+        if (id) {
+          if (seen.has(id)) {
+            issues.push(`${where}: el id "${id}" está repetido en el archivo`)
+            return
+          }
+          seen.add(id)
+        }
         creations.push({
+          id: id || undefined,
           cover: covers.get(entry),
           draft: { ...fields, tracklist: fields.tracklist ?? [] } as Release,
           where,
@@ -318,7 +342,10 @@ releasesRouter.post("/importar", writeRateLimit, requireAdmin, async (req, res) 
     }
 
     for (const creation of creations) {
-      const base = slugify(creation.draft.artist, creation.draft.title) || `disco-${Date.now()}`
+      // Con id en el archivo se respeta ese; si no, se deriva de artista y título.
+      const base =
+        creation.id ??
+        (slugify(creation.draft.artist, creation.draft.title) || `disco-${Date.now()}`)
       const id = (await releaseExists(base, tx)) ? `${base}-${Date.now().toString(36)}` : base
       await createRelease({ ...creation.draft, id }, tx)
       keep.push(id)
