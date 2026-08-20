@@ -57,6 +57,10 @@ export const CATALOG_SCHEMA_SQL = `
       shipping_cost INTEGER NOT NULL,
       total INTEGER NOT NULL,
       status TEXT NOT NULL DEFAULT 'pendiente',
+      payment_status TEXT,
+      payment_id TEXT,
+      preference_id TEXT,
+      paid_at TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -100,4 +104,8 @@ export async function migrate(): Promise<void> {
   await ensureColumn("releases", "visible", "visible INTEGER NOT NULL DEFAULT 1")
   await ensureColumn("releases", "is_preorder", "is_preorder INTEGER NOT NULL DEFAULT 0")
   await ensureColumn("releases", "is_featured", "is_featured INTEGER NOT NULL DEFAULT 0")
+  await ensureColumn("orders", "payment_status", "payment_status TEXT")
+  await ensureColumn("orders", "payment_id", "payment_id TEXT")
+  await ensureColumn("orders", "preference_id", "preference_id TEXT")
+  await ensureColumn("orders", "paid_at", "paid_at TEXT")
 }

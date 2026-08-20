@@ -15,6 +15,7 @@ import {
 import { metaRouter } from "./routes/meta.js"
 import { newsletterRouter } from "./routes/newsletter.js"
 import { ordersRouter } from "./routes/orders.js"
+import { paymentsRouter } from "./routes/payments.js"
 import { releasesRouter } from "./routes/releases.js"
 import { wishlistRouter } from "./routes/wishlist.js"
 
@@ -50,6 +51,7 @@ export function configureApp(app: Express): Express {
 
   app.use("/api/releases", releasesRouter)
   app.use("/api/orders", ordersRouter)
+  app.use("/api/pagos", paymentsRouter)
   app.use("/api/meta", metaRouter)
   app.use("/api/newsletter", newsletterRouter)
   app.use("/api/lista-deseos", wishlistRouter)

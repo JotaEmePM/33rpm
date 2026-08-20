@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto"
 import { all, type Executor, int, one, run, transaction } from "../db/connection.js"
-import type { Order, OrderItem, OrderStatus, ShippingMethod } from "../types.js"
+import type { Order, OrderItem, OrderStatus, PaymentStatus, ShippingMethod } from "../types.js"
 import { decrementStock, getRelease } from "./releases.js"
 
 /** Tarifa plana de muestra: reemplazar por la política real de despacho. */
@@ -41,6 +41,10 @@ interface OrderRow {
   shipping_cost: number
   total: number
   status: string
+  payment_status: string | null
+  payment_id: string | null
+  preference_id: string | null
+  paid_at: string | null
   created_at: string
 }
 
@@ -67,6 +71,9 @@ function toOrder(row: OrderRow, items: OrderItem[]): Order {
     shippingCost: int(row.shipping_cost),
     total: int(row.total),
     status: row.status as OrderStatus,
+    paymentStatus: (row.payment_status as PaymentStatus | null) ?? "sin_iniciar",
+    paymentId: row.payment_id,
+    paidAt: row.paid_at,
     createdAt: row.created_at,
     items,
   }
@@ -174,6 +181,84 @@ export async function listOrders(limit = 50, on?: Executor): Promise<Order[]> {
     orders.push(toOrder(row, await itemsFor(row.id, on)))
   }
   return orders
+}
+
+/** Deja anotada la preferencia con la que el cliente se fue a pagar. */
+export async function setOrderPreference(
+  id: string,
+  preferenceId: string,
+  on?: Executor,
+): Promise<void> {
+  await run(
+    "UPDATE orders SET preference_id = ?, payment_status = COALESCE(payment_status, 'pendiente') WHERE id = ?",
+    [preferenceId, id],
+    on,
+  )
+}
+
+/** Devuelve al catálogo las unidades de un pedido que no llegó a cobrarse. */
+async function restoreStock(id: string, on: Executor): Promise<void> {
+  const items = await all<{ release_id: string; quantity: number }>(
+    "SELECT release_id, quantity FROM order_items WHERE order_id = ?",
+    [id],
+    on,
+  )
+  for (const item of items) {
+    await run(
+      "UPDATE releases SET stock = stock + ? WHERE id = ?",
+      [int(item.quantity), item.release_id],
+      on,
+    )
+  }
+}
+
+/**
+ * Aplica lo que diga Mercado Pago sobre un pago.
+ *
+ * Es idempotente porque las notificaciones se repiten: si el pedido ya está en
+ * ese estado no se vuelve a tocar, y el stock sólo se repone la primera vez que
+ * el pago se da por perdido.
+ */
+export async function applyPaymentResult(
+  id: string,
+  result: { paymentStatus: PaymentStatus; paymentId: string },
+  on?: Executor,
+): Promise<Order | null> {
+  if (!on) return transaction((tx) => applyPaymentResult(id, result, tx))
+
+  const current = await getOrder(id, on)
+  if (!current) return null
+  if (current.paymentStatus === result.paymentStatus) return current
+
+  const { paymentStatus, paymentId } = result
+  // Un pago que nunca prosperó libera las unidades; un reembolso no, porque el
+  // disco pudo haber salido ya y esa decisión es de la tienda.
+  const lost = paymentStatus === "rechazado" || paymentStatus === "anulado"
+
+  // "enviado" no retrocede: si el disco ya salió, el cobro se resuelve fuera del sistema.
+  let status: OrderStatus = current.status
+  if (paymentStatus === "aprobado" && current.status === "pendiente") status = "pagado"
+  if (lost && current.status === "pendiente") status = "anulado"
+  if (paymentStatus === "reembolsado" && current.status !== "enviado") status = "anulado"
+
+  await run(
+    `UPDATE orders
+     SET status = ?, payment_status = ?, payment_id = ?, paid_at = ?
+     WHERE id = ?`,
+    [
+      status,
+      paymentStatus,
+      paymentId,
+      paymentStatus === "aprobado" ? (current.paidAt ?? new Date().toISOString()) : current.paidAt,
+      id,
+    ],
+    on,
+  )
+
+  // Sólo cuando el pedido estaba vivo: un anulado ya devolvió lo suyo.
+  if (lost && current.status === "pendiente") await restoreStock(id, on)
+
+  return getOrder(id, on)
 }
 
 export async function updateOrderStatus(

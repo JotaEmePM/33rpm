@@ -1,5 +1,7 @@
 import { type Request, type Response, Router } from "express"
+import { env } from "../config/env.js"
 import { param } from "../lib/http.js"
+import { createPreference, isPaymentsConfigured } from "../lib/mercadopago.js"
 import { ORDER_STATUSES, SHIPPING_METHODS, ValidationError, Validator } from "../lib/validation.js"
 import { requireAdmin } from "../middleware/require-auth.js"
 import { writeRateLimit } from "../middleware/security.js"
@@ -8,6 +10,7 @@ import {
   getOrder,
   listOrders,
   type OrderDraft,
+  setOrderPreference,
   updateOrderStatus,
 } from "../repositories/orders.js"
 
@@ -57,6 +60,51 @@ ordersRouter.post("/", writeRateLimit, async (req: Request, res: Response) => {
   })
 
   res.status(201).json(order)
+})
+
+/**
+ * Arranca el cobro: crea la preferencia de Checkout Pro y devuelve a dónde
+ * mandar al cliente. Se puede repetir sobre un pedido pendiente, por si el
+ * primer intento se abandonó.
+ */
+ordersRouter.post("/:id/pago", writeRateLimit, async (req: Request, res: Response) => {
+  if (!isPaymentsConfigured()) {
+    res.status(503).json({ error: "Los pagos en línea no están configurados" })
+    return
+  }
+
+  const id = param(req, "id")
+  const order = await getOrder(id)
+  if (!order) {
+    res.status(404).json({ error: "Pedido no encontrado" })
+    return
+  }
+  if (order.status !== "pendiente") {
+    res.status(409).json({ error: "Este pedido ya no admite pago" })
+    return
+  }
+
+  const preference = await createPreference({
+    orderId: order.id,
+    items: [
+      ...order.items.map((item) => ({
+        id: item.releaseId,
+        title: `${item.artist} — ${item.title}`,
+        quantity: item.quantity,
+        unit_price: item.unitPrice,
+      })),
+      // El despacho va como una línea más: si no, se cobraría de menos.
+      ...(order.shippingCost > 0
+        ? [{ id: "despacho", title: "Despacho", quantity: 1, unit_price: order.shippingCost }]
+        : []),
+    ],
+    payer: { name: order.customerName, email: order.customerEmail },
+    backUrl: `${env.appUrl}/pedido/${order.id}`,
+    notificationUrl: env.paymentsNotificationUrl,
+  })
+
+  await setOrderPreference(order.id, preference.id)
+  res.json({ preferenceId: preference.id, initPoint: preference.initPoint })
 })
 
 ordersRouter.get("/", requireAdmin, async (_req: Request, res: Response) => {

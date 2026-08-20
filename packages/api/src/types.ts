@@ -4,6 +4,15 @@ export type ReleaseCondition = "Nuevo" | "Usado"
 
 export type OrderStatus = "pendiente" | "pagado" | "enviado" | "anulado"
 
+/** Estado del cobro tal como lo reporta Mercado Pago, más el previo al intento. */
+export type PaymentStatus =
+  | "sin_iniciar"
+  | "pendiente"
+  | "aprobado"
+  | "rechazado"
+  | "anulado"
+  | "reembolsado"
+
 export type ShippingMethod = "retiro" | "despacho"
 
 export interface Track {
@@ -86,6 +95,10 @@ export interface Order {
   shippingCost: number
   total: number
   status: OrderStatus
+  /** Cómo va el cobro; el pedido puede existir sin haberse intentado pagar. */
+  paymentStatus: PaymentStatus
+  paymentId: string | null
+  paidAt: string | null
   createdAt: string
   items: OrderItem[]
 }

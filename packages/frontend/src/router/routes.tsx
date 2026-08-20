@@ -12,6 +12,7 @@ import { CheckoutPage } from "../pages/CheckoutPage"
 import { HomePage } from "../pages/HomePage"
 import { LoginPage } from "../pages/LoginPage"
 import { NotFoundPage } from "../pages/NotFoundPage"
+import { OrderPage } from "../pages/OrderPage"
 import { ProductPage } from "../pages/ProductPage"
 import { WishlistPage } from "../pages/WishlistPage"
 import { catalogLoader, releaseLoader } from "./loaders"
@@ -38,6 +39,7 @@ export const routes: RouteObject[] = [
       { path: "login", element: <LoginPage /> },
       { path: "carrito", element: <CartPage /> },
       { path: "lista-deseos", element: <WishlistPage /> },
+      { path: "pedido/:id", element: <OrderPage /> },
       { path: "checkout", element: <CheckoutPage /> },
       {
         path: "admin/productos",

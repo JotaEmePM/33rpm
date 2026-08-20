@@ -1,7 +1,7 @@
 import { type FormEvent, useState } from "react"
 import { Link } from "react-router"
 import { ApiError } from "../api/client"
-import { createOrder, type Order, type ShippingMethod } from "../api/orders"
+import { createOrder, type Order, type ShippingMethod, startPayment } from "../api/orders"
 import { CartSummary } from "../components/cart/CartSummary"
 import { EmptyCart } from "../components/cart/EmptyCart"
 import { CheckoutForm } from "../components/checkout/CheckoutForm"
@@ -37,8 +37,17 @@ export function CheckoutPage() {
         items: lines.map((line) => ({ releaseId: line.release.id, quantity: line.quantity })),
       })
 
-      setOrder(created)
       clear()
+
+      // Checkout Pro cobra fuera de la tienda: si está configurado, el pedido
+      // sigue en Mercado Pago; si no, se muestra el resguardo de siempre.
+      try {
+        const { initPoint } = await startPayment(created.id)
+        window.location.href = initPoint
+        return
+      } catch {
+        setOrder(created)
+      }
     } catch (caught) {
       if (caught instanceof ApiError) {
         setError(caught.issues?.length ? caught.issues.join(" · ") : caught.message)

@@ -57,6 +57,21 @@ export const env = {
   /** Remitente de los correos. Cambiarlo es todo lo que pide mudarse a un dominio propio. */
   mailFrom: process.env.MAIL_FROM ?? "33rpm <onboarding@resend.dev>",
 
+  /** Mercado Pago: sin token, el checkout deja el pedido pendiente sin cobrar. */
+  mercadoPagoToken: process.env.MP_ACCESS_TOKEN,
+
+  /** Clave con la que Mercado Pago firma las notificaciones de pago. */
+  mercadoPagoWebhookSecret: process.env.MP_WEBHOOK_SECRET,
+
+  /**
+   * A dónde avisa Mercado Pago cuando cambia un pago. Por defecto va por el
+   * mismo dominio que la tienda, que es quien hace de proxy del API; se puede
+   * apuntar directo al API sin tocar código.
+   */
+  paymentsNotificationUrl:
+    process.env.MP_NOTIFICATION_URL ??
+    `${process.env.APP_URL ?? "http://localhost:5174"}/api/pagos/webhook`,
+
   /** Correos que reciben rol admin la primera vez que entran. */
   adminEmails: list("ADMIN_EMAILS", ""),
 

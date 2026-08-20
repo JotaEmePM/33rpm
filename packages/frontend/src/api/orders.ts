@@ -21,6 +21,14 @@ export interface OrderItem {
   quantity: number
 }
 
+export type PaymentStatus =
+  | "sin_iniciar"
+  | "pendiente"
+  | "aprobado"
+  | "rechazado"
+  | "anulado"
+  | "reembolsado"
+
 export interface Order {
   id: string
   customerName: string
@@ -30,12 +38,25 @@ export interface Order {
   shippingCost: number
   total: number
   status: string
+  paymentStatus: PaymentStatus
+  paymentId: string | null
+  paidAt: string | null
   createdAt: string
   items: OrderItem[]
 }
 
 export function createOrder(draft: OrderDraft): Promise<Order> {
   return request<Order>("/api/orders", { method: "POST", body: draft })
+}
+
+/**
+ * Arranca el cobro y devuelve a dónde mandar al cliente: Checkout Pro cobra en
+ * el sitio de Mercado Pago, no aquí.
+ */
+export function startPayment(orderId: string): Promise<{ initPoint: string }> {
+  return request<{ initPoint: string }>(`/api/orders/${encodeURIComponent(orderId)}/pago`, {
+    method: "POST",
+  })
 }
 
 export function fetchOrder(id: string, signal?: AbortSignal): Promise<Order> {
