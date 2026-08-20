@@ -104,6 +104,8 @@ interface ImportRow extends Record<string, unknown> {
  * catálogo nunca queda a medio actualizar. Con `sincronizar` el archivo se toma
  * como la foto completa de la tienda y lo que no aparezca deja de mostrarse;
  * sin él, una subida parcial sólo toca las filas que trae.
+ *
+ * En la columna de stock, -1 oculta el disco y -2 lo elimina.
  */
 releasesRouter.post("/importar", writeRateLimit, requireAdmin, async (req, res) => {
   const rows = req.body?.items
@@ -119,6 +121,7 @@ releasesRouter.post("/importar", writeRateLimit, requireAdmin, async (req, res) 
   const issues: string[] = []
   const updates: { id: string; changes: Partial<Release>; where: string }[] = []
   const creations: { draft: Omit<Release, "id">; where: string }[] = []
+  const deletions: { id: string; where: string }[] = []
   const seen = new Set<string>()
 
   rows.forEach((entry: ImportRow, index: number) => {
@@ -132,6 +135,22 @@ releasesRouter.post("/importar", writeRateLimit, requireAdmin, async (req, res) 
 
     const id = typeof entry.id === "string" ? entry.id.trim() : ""
     const isNewRow = id.length === 0
+
+    // -2 borra el disco del catálogo. Es lo único que no se puede deshacer, así
+    // que sólo se admite sobre una fila que ya tenga id.
+    if (Number(entry.stock) === -2) {
+      if (isNewRow) {
+        issues.push(`${where}: para eliminar hace falta el id del disco`)
+        return
+      }
+      if (seen.has(id)) {
+        issues.push(`${where}: el id "${id}" está repetido en el archivo`)
+        return
+      }
+      seen.add(id)
+      deletions.push({ id, where })
+      return
+    }
 
     // -1 en stock es el atajo para ocultar sin tener que tocar la columna visible;
     // el stock real se conserva por si el disco vuelve a la tienda.
@@ -182,6 +201,14 @@ releasesRouter.post("/importar", writeRateLimit, requireAdmin, async (req, res) 
     // Se comprueba después de intentarlo todo para devolver la lista completa de una vez.
     if (missing.length > 0) throw new ValidationError(missing)
 
+    const gone: string[] = []
+    for (const deletion of deletions) {
+      if (!(await deleteRelease(deletion.id, tx))) {
+        gone.push(`${deletion.where}: el disco "${deletion.id}" no existe en el catálogo`)
+      }
+    }
+    if (gone.length > 0) throw new ValidationError(gone)
+
     const keep = updates.map((update) => update.id)
 
     for (const creation of creations) {
@@ -197,6 +224,7 @@ releasesRouter.post("/importar", writeRateLimit, requireAdmin, async (req, res) 
     return {
       actualizados: updates.length,
       creados: creations.length,
+      eliminados: deletions.length,
       ocultados: hidden.length,
     }
   })

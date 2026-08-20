@@ -74,6 +74,8 @@ export function updateRelease(id: string, changes: Partial<Release>): Promise<Re
 export interface ImportResult {
   actualizados: number
   creados: number
+  /** Discos borrados del catálogo con -2 en el stock. */
+  eliminados: number
   /** Discos que ya no venían en el archivo y dejaron de mostrarse. */
   ocultados: number
 }

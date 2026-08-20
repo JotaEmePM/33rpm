@@ -45,7 +45,7 @@ pnpm --dir packages/frontend lint:oxlint
 - `createOrder` descuenta stock dentro de la transacción y devuelve 409 si no alcanza.
 - `POST /api/releases/importar` (admin) aplica el CSV del panel: reutiliza `parseReleaseBody` fila a fila, es **todo o nada** —una fila mala aborta la transacción entera— y las filas sin `id` se dan de alta con `slugify`. Con `sincronizar: true` el archivo se toma como la foto completa y `hideMissing` oculta lo que no aparezca; sin ese campo, una subida parcial sólo toca lo que trae.
 - **Marcas del disco**: `is_new` (novedad del drop), `is_preorder` (preventa) e `is_featured` (portada). Se filtran con `novedad=1`, `preventa=1` y `destacado=1`, y como toda columna añadida después, entran por `ensureColumn`.
-- **Visibilidad**: `releases.visible` decide si un disco se muestra. Oculto no es borrado —conserva stock e id— pero desaparece del catálogo, de `/api/meta`, de la búsqueda y de su propia ficha (404 salvo admin), y `createOrder` lo rechaza con 409. En el CSV se controla con la columna `visible` o poniendo `-1` en el stock. La columna se añade con `ensureColumn` en `migrate()`, porque `CREATE TABLE IF NOT EXISTS` no altera tablas ya creadas.
+- **Visibilidad**: `releases.visible` decide si un disco se muestra. Oculto no es borrado —conserva stock e id— pero desaparece del catálogo, de `/api/meta`, de la búsqueda y de su propia ficha (404 salvo admin), y `createOrder` lo rechaza con 409. En el CSV se controla con la columna `visible` o poniendo `-1` en el stock; `-2` **elimina** el disco (con sus pistas), y por eso `deleteRelease` borra las pistas a mano en vez de fiarse del `ON DELETE CASCADE`, que en el SQLite local está apagado. Los pedidos guardan su copia de artista, título y precio, así que borrar no toca el histórico. La columna se añade con `ensureColumn` en `migrate()`, porque `CREATE TABLE IF NOT EXISTS` no altera tablas ya creadas.
 
 ### `packages/frontend` — React 19, Vite, Tailwind v4, react-router 8
 
@@ -55,7 +55,7 @@ pnpm --dir packages/frontend lint:oxlint
 - Los filtros del catálogo viven en la URL (`genero`, `formato`, `estado`, `stock`, `orden`), no en estado local: así son enlazables y cada cambio es una navegación animable.
 - El buscador del header es un combobox con sugerencias: `useSearchSuggestions` retrasa la consulta 200 ms y `useAsync` cancela la anterior, así que una respuesta lenta nunca pisa a la más reciente.
 - El carrusel de la portada muestra los **destacados**; si no hay ninguno marcado cae a los discos más recientes, para que la portada nunca quede sin sección.
-- El panel avisa antes de ocultar: al subir un CSV compara con el catálogo y, si faltan discos que hoy se ven, pide confirmación y los lista en vez de aplicarlo de una.
+- El panel avisa antes de ocultar o borrar: al subir un CSV compara con el catálogo y, si faltan discos que hoy se ven o alguna fila trae `-2`, pide confirmación y los lista en vez de aplicarlo de una.
 - El CSV del panel se arma y se lee en el cliente (`lib/csv.ts` para el formato, `lib/catalog-csv.ts` para las columnas en español). Lleva BOM porque si no Excel destroza los acentos, y al leer detecta si el separador es coma, punto y coma o tabulador.
 - Tailwind v4 **sin `tailwind.config`**: los tokens (`ink`, `paper`, `volt`, `font-display`…) se declaran en `@theme` dentro de `src/index.css`.
 

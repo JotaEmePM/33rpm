@@ -216,7 +216,15 @@ export async function updateRelease(
   return next
 }
 
+/**
+ * Borra el disco y sus pistas. El `ON DELETE CASCADE` sólo actúa con las claves
+ * foráneas activas, y en el SQLite local vienen apagadas: se hace a mano para
+ * que el resultado sea el mismo contra Turso que contra un archivo.
+ */
 export async function deleteRelease(id: string, on?: Executor): Promise<boolean> {
+  if (!on) return transaction((tx) => deleteRelease(id, tx))
+
+  await run("DELETE FROM tracks WHERE release_id = ?", [id], on)
   return (await run("DELETE FROM releases WHERE id = ?", [id], on)) > 0
 }
 
