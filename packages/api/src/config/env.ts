@@ -51,6 +51,12 @@ export const env = {
   tursoUrl: process.env.TURSO_DATABASE_URL,
   tursoAuthToken: process.env.TURSO_AUTH_TOKEN,
 
+  /** Resend: sin clave el enlace mágico se imprime en el log en vez de enviarse. */
+  resendApiKey: process.env.RESEND_API_KEY,
+
+  /** Remitente de los correos. Cambiarlo es todo lo que pide mudarse a un dominio propio. */
+  mailFrom: process.env.MAIL_FROM ?? "33rpm <onboarding@resend.dev>",
+
   /** Correos que reciben rol admin la primera vez que entran. */
   adminEmails: list("ADMIN_EMAILS", ""),
 
