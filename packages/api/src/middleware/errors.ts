@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from "express"
 import { ValidationError } from "../lib/validation.js"
 import { OrderError } from "../repositories/orders.js"
+import { CorsError } from "./security.js"
 
 export function notFound(_req: Request, res: Response): void {
   res.status(404).json({ error: "Ruta no encontrada" })
@@ -14,6 +15,11 @@ export function errorHandler(
 ): void {
   if (error instanceof ValidationError) {
     res.status(422).json({ error: error.message, issues: error.issues })
+    return
+  }
+
+  if (error instanceof CorsError) {
+    res.status(error.status).json({ error: error.message })
     return
   }
 

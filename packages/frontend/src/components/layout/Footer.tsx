@@ -30,6 +30,7 @@ export function Footer() {
               <Link
                 key={link.label}
                 to={link.to}
+                viewTransition
                 className="text-sm text-muted transition-colors hover:text-paper"
               >
                 {link.label}

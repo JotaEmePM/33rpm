@@ -1,6 +1,8 @@
 import { type Request, type Response, Router } from "express"
 import { param } from "../lib/http.js"
 import { ORDER_STATUSES, SHIPPING_METHODS, ValidationError, Validator } from "../lib/validation.js"
+import { requireAdmin } from "../middleware/require-auth.js"
+import { writeRateLimit } from "../middleware/security.js"
 import {
   createOrder,
   getOrder,
@@ -28,7 +30,7 @@ function parseItems(value: unknown): OrderDraft["items"] {
   })
 }
 
-ordersRouter.post("/", (req: Request, res: Response) => {
+ordersRouter.post("/", writeRateLimit, (req: Request, res: Response) => {
   const body = (req.body ?? {}) as Record<string, unknown>
   const validator = new Validator(body)
 
@@ -57,7 +59,7 @@ ordersRouter.post("/", (req: Request, res: Response) => {
   res.status(201).json(order)
 })
 
-ordersRouter.get("/", (_req: Request, res: Response) => {
+ordersRouter.get("/", requireAdmin, (_req: Request, res: Response) => {
   res.json({ items: listOrders() })
 })
 
@@ -70,7 +72,7 @@ ordersRouter.get("/:id", (req: Request, res: Response) => {
   res.json(order)
 })
 
-ordersRouter.patch("/:id/estado", (req: Request, res: Response) => {
+ordersRouter.patch("/:id/estado", requireAdmin, (req: Request, res: Response) => {
   const validator = new Validator((req.body ?? {}) as Record<string, unknown>)
   const status = validator.oneOf("status", ORDER_STATUSES)
   validator.done()

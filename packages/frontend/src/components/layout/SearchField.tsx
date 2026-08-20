@@ -9,7 +9,9 @@ export function SearchField({ className = "" }: { className?: string }) {
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const trimmed = query.trim()
-    navigate(trimmed ? `/catalogo?q=${encodeURIComponent(trimmed)}` : "/catalogo")
+    navigate(trimmed ? `/catalogo?q=${encodeURIComponent(trimmed)}` : "/catalogo", {
+      viewTransition: true,
+    })
   }
 
   return (

@@ -21,7 +21,9 @@ export function HomePage() {
         genres={meta.genres}
         selected={null}
         onSelect={(genre) =>
-          navigate(genre ? `/catalogo?genero=${encodeURIComponent(genre)}` : "/catalogo")
+          navigate(genre ? `/catalogo?genero=${encodeURIComponent(genre)}` : "/catalogo", {
+            viewTransition: true,
+          })
         }
       />
 

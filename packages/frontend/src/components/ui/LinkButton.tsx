@@ -18,7 +18,7 @@ export function LinkButton({
   children,
 }: LinkButtonProps) {
   return (
-    <Link to={to} className={buttonClasses(variant, size, className)}>
+    <Link to={to} viewTransition className={buttonClasses(variant, size, className)}>
       {children}
     </Link>
   )

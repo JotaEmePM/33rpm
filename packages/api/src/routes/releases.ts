@@ -1,6 +1,8 @@
 import { type Request, type Response, Router } from "express"
 import { param } from "../lib/http.js"
 import { CONDITIONS, FORMATS, slugify, ValidationError, Validator } from "../lib/validation.js"
+import { requireAdmin } from "../middleware/require-auth.js"
+import { writeRateLimit } from "../middleware/security.js"
 import {
   createRelease,
   deleteRelease,
@@ -99,7 +101,7 @@ releasesRouter.get("/:id", (req: Request, res: Response) => {
   res.json(release)
 })
 
-releasesRouter.post("/", (req: Request, res: Response) => {
+releasesRouter.post("/", writeRateLimit, requireAdmin, (req: Request, res: Response) => {
   const parsed = parseReleaseBody(req.body ?? {}, false)
 
   let id = slugify(parsed.artist as string, parsed.title as string)
@@ -124,7 +126,7 @@ releasesRouter.post("/", (req: Request, res: Response) => {
   res.status(201).json(createRelease(release))
 })
 
-releasesRouter.patch("/:id", (req: Request, res: Response) => {
+releasesRouter.patch("/:id", writeRateLimit, requireAdmin, (req: Request, res: Response) => {
   const parsed = parseReleaseBody(req.body ?? {}, true)
   const changes = Object.fromEntries(
     Object.entries(parsed).filter(([, value]) => value !== undefined),
@@ -138,7 +140,7 @@ releasesRouter.patch("/:id", (req: Request, res: Response) => {
   res.json(updated)
 })
 
-releasesRouter.delete("/:id", (req: Request, res: Response) => {
+releasesRouter.delete("/:id", writeRateLimit, requireAdmin, (req: Request, res: Response) => {
   if (!deleteRelease(param(req, "id"))) {
     res.status(404).json({ error: "Disco no encontrado" })
     return

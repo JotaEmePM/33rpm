@@ -17,6 +17,7 @@ export function CartLineItem({ line }: { line: CartLine }) {
       <div className="min-w-40 flex-1">
         <Link
           to={`/disco/${release.id}`}
+          viewTransition
           className="font-display text-xl uppercase hover:text-volt"
         >
           {release.title}

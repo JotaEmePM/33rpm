@@ -1,7 +1,8 @@
+import { AUTH_SCHEMA_SQL } from "./auth-schema.js"
 import { db } from "./connection.js"
 
-export function migrate(): void {
-  db.exec(`
+/** DDL del catálogo. Única fuente de verdad: la usan el arranque local y la migración a Turso. */
+export const CATALOG_SCHEMA_SQL = `
     CREATE TABLE IF NOT EXISTS releases (
       id TEXT PRIMARY KEY,
       artist TEXT NOT NULL,
@@ -60,5 +61,9 @@ export function migrate(): void {
       email TEXT PRIMARY KEY,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
-  `)
+  `
+
+export function migrate(): void {
+  db.exec(AUTH_SCHEMA_SQL)
+  db.exec(CATALOG_SCHEMA_SQL)
 }

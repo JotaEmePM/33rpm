@@ -13,6 +13,7 @@ export function ProductRow({ release, onDelete }: ProductRowProps) {
       <td className="p-3">
         <Link
           to={`/disco/${release.id}`}
+          viewTransition
           className="font-display text-lg uppercase hover:text-volt"
         >
           {release.title}

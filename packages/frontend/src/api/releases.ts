@@ -47,16 +47,20 @@ export function fetchRelease(id: string, signal?: AbortSignal): Promise<Release>
 export type ReleaseDraft = Omit<Release, "id"> & { id?: string }
 
 export function createRelease(draft: ReleaseDraft): Promise<Release> {
-  return request<Release>("/api/releases", { method: "POST", body: draft })
+  return request<Release>("/api/releases", { method: "POST", body: draft, auth: true })
 }
 
 export function updateRelease(id: string, changes: Partial<Release>): Promise<Release> {
   return request<Release>(`/api/releases/${encodeURIComponent(id)}`, {
     method: "PATCH",
     body: changes,
+    auth: true,
   })
 }
 
 export function deleteRelease(id: string): Promise<void> {
-  return request<void>(`/api/releases/${encodeURIComponent(id)}`, { method: "DELETE" })
+  return request<void>(`/api/releases/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    auth: true,
+  })
 }

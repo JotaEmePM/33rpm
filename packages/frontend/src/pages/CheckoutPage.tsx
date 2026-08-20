@@ -98,7 +98,11 @@ export function CheckoutPage() {
                 <span className="truncate">
                   {line.quantity}× {line.release.title}
                 </span>
-                <Link to={`/disco/${line.release.id}`} className="label shrink-0 hover:text-volt">
+                <Link
+                  to={`/disco/${line.release.id}`}
+                  viewTransition
+                  className="label shrink-0 hover:text-volt"
+                >
                   Ver
                 </Link>
               </li>

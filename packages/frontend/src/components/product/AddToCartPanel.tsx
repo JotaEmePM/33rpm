@@ -1,5 +1,6 @@
-import { useState } from "react"
+import { type RefObject, useEffect, useRef, useState } from "react"
 import { useCart } from "../../hooks/useCart"
+import { useFlyToCart } from "../../hooks/useFlyToCart"
 import type { Release } from "../../types"
 import { CheckIcon } from "../icons/CheckIcon"
 import { Badge } from "../ui/Badge"
@@ -7,15 +8,32 @@ import { Button } from "../ui/Button"
 import { Price } from "../ui/Price"
 import { QuantityStepper } from "../ui/QuantityStepper"
 
-export function AddToCartPanel({ release }: { release: Release }) {
+interface AddToCartPanelProps {
+  release: Release
+  /** Carátula de la ficha: es la que vuela al carrito. */
+  sleeveRef?: RefObject<HTMLDivElement | null>
+}
+
+export function AddToCartPanel({ release, sleeveRef }: AddToCartPanelProps) {
   const { add } = useCart()
+  const { flyToCart } = useFlyToCart()
   const [quantity, setQuantity] = useState(1)
   const [added, setAdded] = useState(false)
   const soldOut = release.stock === 0
 
-  function handleAdd() {
+  const mounted = useRef(true)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
+
+  async function handleAdd() {
+    await flyToCart(sleeveRef?.current ?? null)
     add(release, quantity)
-    setAdded(true)
+    // El vuelo dura más que un clic en "atrás": el disco entra igual, el aviso no.
+    if (mounted.current) setAdded(true)
   }
 
   return (

@@ -14,8 +14,16 @@
     "format": "biome format --write ."
   },
   "dependencies": {
+    "@libsql/kysely-libsql": "^0.4.1",
+    "better-auth": "^1.7.1",
     "cors": "^2.8.5",
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.6.2",
+    "helmet": "^8.3.0",
+    "jose": "^6.2.9",
+    "kysely": "^0.29.5",
+    "pino": "^10.3.1",
+    "pino-http": "^11.0.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.9",

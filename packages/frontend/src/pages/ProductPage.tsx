@@ -1,35 +1,19 @@
-import { Link, useParams } from "react-router"
+import { useRef } from "react"
+import { Link, useLoaderData } from "react-router"
 import { ReleaseCard } from "../components/catalog/ReleaseCard"
 import { AddToCartPanel } from "../components/product/AddToCartPanel"
 import { ReleaseMeta } from "../components/product/ReleaseMeta"
 import { Tracklist } from "../components/product/Tracklist"
 import { Sleeve } from "../components/ui/Sleeve"
-import { ErrorState, LoadingState } from "../components/ui/StateMessage"
-import { useRelease, useReleases } from "../hooks/useReleases"
-import { NotFoundPage } from "./NotFoundPage"
+import { useReleases } from "../hooks/useReleases"
+import type { Release } from "../types"
 
 export function ProductPage() {
-  const { id } = useParams()
-  const { data: release, loading, error } = useRelease(id)
-  const related = useReleases({ genre: release?.genre ?? null, pageSize: 5 })
-
-  if (loading) {
-    return (
-      <div className="px-4 py-10 sm:px-6">
-        <LoadingState label="Cargando disco" />
-      </div>
-    )
-  }
-
-  if (!release) {
-    // Un 404 del backend es un disco inexistente; cualquier otro error se muestra como tal.
-    if (error?.includes("no encontrado")) return <NotFoundPage />
-    return (
-      <div className="px-4 py-10 sm:px-6">
-        <ErrorState message={error ?? "No pudimos cargar este disco"} />
-      </div>
-    )
-  }
+  // El loader ya resolvió el disco: sin estado de carga, la carátula existe cuando
+  // el navegador toma el snapshot y puede morfear desde la card del catálogo.
+  const release = useLoaderData() as Release
+  const sleeveRef = useRef<HTMLDivElement>(null)
+  const related = useReleases({ genre: release.genre, pageSize: 5 })
 
   const relatedItems = (related.data?.items ?? [])
     .filter((item) => item.id !== release.id)
@@ -38,12 +22,13 @@ export function ProductPage() {
   return (
     <>
       <nav className="label border-b border-ash px-4 py-3 text-muted sm:px-6" aria-label="Miga">
-        <Link to="/catalogo" className="hover:text-volt">
+        <Link to="/catalogo" viewTransition className="hover:text-volt">
           Catálogo
         </Link>
         <span className="px-2">/</span>
         <Link
           to={`/catalogo?genero=${encodeURIComponent(release.genre)}`}
+          viewTransition
           className="hover:text-volt"
         >
           {release.genre}
@@ -52,7 +37,12 @@ export function ProductPage() {
 
       <div className="grid gap-8 border-b-2 border-paper px-4 py-8 sm:px-6 lg:grid-cols-2">
         <div className="flex flex-col gap-6">
-          <Sleeve artist={release.artist} title={release.title} />
+          <Sleeve
+            ref={sleeveRef}
+            artist={release.artist}
+            title={release.title}
+            viewTransitionName={`sleeve-${release.id}`}
+          />
           <ReleaseMeta release={release} />
         </div>
 
@@ -64,7 +54,7 @@ export function ProductPage() {
             </h1>
           </div>
 
-          <AddToCartPanel release={release} />
+          <AddToCartPanel release={release} sleeveRef={sleeveRef} />
           <Tracklist tracks={release.tracklist} />
         </div>
       </div>

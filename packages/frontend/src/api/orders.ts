@@ -42,6 +42,7 @@ export function fetchOrder(id: string, signal?: AbortSignal): Promise<Order> {
   return request<Order>(`/api/orders/${encodeURIComponent(id)}`, { signal })
 }
 
+/** Solo para administración: el API exige rol admin. */
 export function fetchOrders(signal?: AbortSignal): Promise<{ items: Order[] }> {
-  return request<{ items: Order[] }>("/api/orders", { signal })
+  return request<{ items: Order[] }>("/api/orders", { signal, auth: true })
 }

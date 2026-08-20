@@ -1,8 +1,14 @@
+import type { Ref } from "react"
+
 interface SleeveProps {
   artist: string
   title: string
   /** Define el ancho de la carátula; el alto sale del aspecto 1:1. */
   className?: string
+  /** Nombre para la view transition; debe ser único en el documento mientras dura. */
+  viewTransitionName?: string
+  /** Punto de partida del vuelo al carrito. */
+  ref?: Ref<HTMLDivElement>
 }
 
 function initials(artist: string): string {
@@ -19,10 +25,18 @@ function initials(artist: string): string {
  * Carátula de relleno mientras el catálogo no tenga imágenes.
  * Dibuja el disco en vez de intentar imitar una portada.
  */
-export function Sleeve({ artist, title, className = "w-full" }: SleeveProps) {
+export function Sleeve({
+  artist,
+  title,
+  className = "w-full",
+  viewTransitionName,
+  ref,
+}: SleeveProps) {
   return (
     <div
+      ref={ref}
       className={`relative aspect-square overflow-hidden bg-smoke ${className}`}
+      style={viewTransitionName ? { viewTransitionName } : undefined}
       role="img"
       aria-label={`Carátula pendiente: ${artist} — ${title}`}
     >

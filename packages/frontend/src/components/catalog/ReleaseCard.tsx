@@ -1,19 +1,51 @@
-import { Link } from "react-router"
+import { useRef } from "react"
+import { Link, useViewTransitionState } from "react-router"
 import { useCart } from "../../hooks/useCart"
+import { useFlyToCart } from "../../hooks/useFlyToCart"
 import type { Release } from "../../types"
 import { Badge } from "../ui/Badge"
 import { Price } from "../ui/Price"
 import { Sleeve } from "../ui/Sleeve"
 
-export function ReleaseCard({ release }: { release: Release }) {
+interface ReleaseCardProps {
+  release: Release
+  /**
+   * Marca la card para que el navegador la siga entre filtros del catálogo.
+   * Debe estar puesto antes de que arranque la navegación, por eso no depende
+   * de que haya una transición en curso.
+   */
+  animated?: boolean
+}
+
+export function ReleaseCard({ release, animated = false }: ReleaseCardProps) {
   const { add } = useCart()
+  const { flyToCart } = useFlyToCart()
+  const sleeveRef = useRef<HTMLDivElement>(null)
+  const to = `/disco/${release.id}`
+  // Solo la card que se está abriendo nombra su carátula: dos elementos con el
+  // mismo view-transition-name cancelarían la transición.
+  const isOpening = useViewTransitionState(to)
   const soldOut = release.stock === 0
 
+  // El disco entra al carrito cuando la carátula aterriza, no al soltar el clic.
+  async function handleAdd() {
+    await flyToCart(sleeveRef.current)
+    add(release)
+  }
+
   return (
-    <article className="flex flex-col gap-3 border-b border-r border-ash p-4">
-      <Link to={`/disco/${release.id}`} className="group flex flex-col gap-3">
+    <article
+      className="flex flex-col gap-3 border-b border-r border-ash p-4"
+      style={animated ? { viewTransitionName: `card-${release.id}` } : undefined}
+    >
+      <Link to={to} viewTransition className="group flex flex-col gap-3">
         <div className="relative">
-          <Sleeve artist={release.artist} title={release.title} />
+          <Sleeve
+            ref={sleeveRef}
+            artist={release.artist}
+            title={release.title}
+            viewTransitionName={isOpening ? `sleeve-${release.id}` : undefined}
+          />
           {release.isNew ? (
             <span className="label absolute left-0 top-0 bg-volt px-2 py-1 text-ink">Nuevo</span>
           ) : null}
@@ -42,7 +74,7 @@ export function ReleaseCard({ release }: { release: Release }) {
         ) : (
           <button
             type="button"
-            onClick={() => add(release)}
+            onClick={handleAdd}
             className="label min-h-11 bg-paper px-4 text-ink transition-colors hover:bg-volt"
           >
             Agregar

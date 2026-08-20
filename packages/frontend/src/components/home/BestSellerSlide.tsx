@@ -7,6 +7,7 @@ export function BestSellerSlide({ release, position }: { release: Release; posit
   return (
     <Link
       to={`/disco/${release.id}`}
+      viewTransition
       className="group flex snap-start flex-col gap-3 border-2 border-ash p-4 transition-colors hover:border-volt"
     >
       <div className="flex items-start gap-3">

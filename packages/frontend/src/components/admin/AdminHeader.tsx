@@ -22,6 +22,7 @@ export function AdminHeader({ title, action }: { title: string; action?: ReactNo
             key={tab.to}
             to={tab.to}
             end
+            viewTransition
             className={({ isActive }) =>
               `label min-h-11 border-b-2 px-3 pt-3 transition-colors ${
                 isActive
