@@ -1,6 +1,6 @@
 import { type ChangeEvent, useRef, useState } from "react"
 import { ApiError } from "../../api/client"
-import { deleteImage, setPrimaryImage, uploadImage } from "../../api/releases"
+import { deleteImage, importLastfmCover, setPrimaryImage, uploadImage } from "../../api/releases"
 import { resizeImage } from "../../lib/image-resize"
 import type { ReleaseImage } from "../../types"
 import { Button } from "../ui/Button"
@@ -10,6 +10,8 @@ interface ImageManagerProps {
   images: ReleaseImage[]
   /** El disco al que pertenecen, sólo para el texto alternativo. */
   label: string
+  /** Con ficha de Last.fm y sin fotos, se puede copiar la portada de allí. */
+  lastfmUrl?: string | null
   onChange: (images: ReleaseImage[]) => void
   compact?: boolean
 }
@@ -22,6 +24,7 @@ export function ImageManager({
   releaseId,
   images,
   label,
+  lastfmUrl,
   onChange,
   compact = false,
 }: ImageManagerProps) {
@@ -58,6 +61,17 @@ export function ImageManager({
     setBusy(null)
   }
 
+  async function handleLastfmCover() {
+    setError(null)
+    setBusy("Trayendo la portada de Last.fm…")
+    try {
+      onChange((await importLastfmCover(releaseId)).items)
+    } catch (caught) {
+      fail(caught, "Last.fm no tiene portada para este disco")
+    }
+    setBusy(null)
+  }
+
   async function handlePrimary(imageId: string) {
     setError(null)
     setBusy("Cambiando la portada…")
@@ -90,6 +104,16 @@ export function ImageManager({
         >
           {images.length > 0 ? "Añadir fotos" : "Subir fotos"}
         </Button>
+        {lastfmUrl && images.length === 0 ? (
+          <Button
+            variant="outline"
+            size={compact ? "sm" : "md"}
+            onClick={handleLastfmCover}
+            disabled={busy !== null}
+          >
+            Portada de Last.fm
+          </Button>
+        ) : null}
         {busy ? (
           <span className="label text-muted" role="status">
             {busy}

@@ -7,6 +7,7 @@ import {
   MAX_IMAGE_BYTES,
   storeImage,
 } from "../lib/blob.js"
+import { importCoverFromLastfm } from "../lib/covers.js"
 import { param } from "../lib/http.js"
 import { fetchAlbumByUrl, isLastfmConfigured } from "../lib/lastfm.js"
 import { CONDITIONS, FORMATS, slugify, ValidationError, Validator } from "../lib/validation.js"
@@ -92,7 +93,11 @@ function parseReleaseBody(body: Record<string, unknown>, partial: boolean) {
     isPreorder: body.isPreorder === undefined ? undefined : validator.boolean("isPreorder"),
     isFeatured: body.isFeatured === undefined ? undefined : validator.boolean("isFeatured"),
     visible: body.visible === undefined ? undefined : validator.boolean("visible"),
-    lastfmUrl: validator.string("lastfmUrl", { required: false, max: 300 }),
+    // Vaciar el campo tiene que poder quitar la ficha: "" es null, no "no lo toques".
+    lastfmUrl:
+      body.lastfmUrl === undefined
+        ? undefined
+        : (validator.string("lastfmUrl", { required: false, max: 300 }) ?? null),
   }
   validator.done()
 
@@ -112,7 +117,10 @@ const LASTFM_BATCH = 4
  * tracklist. Lo que venga escrito en el CSV manda, porque es la decisión de la
  * tienda; Last.fm sólo rellena huecos.
  */
-async function fillFromLastfm(rows: ImportRow[]): Promise<string[]> {
+async function fillFromLastfm(
+  rows: ImportRow[],
+  covers: Map<ImportRow, string>,
+): Promise<string[]> {
   const pending = rows.filter(
     (row) => typeof row.lastfmUrl === "string" && row.lastfmUrl.trim().length > 0,
   )
@@ -141,6 +149,7 @@ async function fillFromLastfm(rows: ImportRow[]): Promise<string[]> {
           if (row.tracklist === undefined && album.tracklist.length > 0) {
             row.tracklist = album.tracklist
           }
+          if (album.imageUrl) covers.set(row, album.imageUrl)
         } catch (error) {
           issues.push(
             `${where}: ${
@@ -160,6 +169,20 @@ async function fillFromLastfm(rows: ImportRow[]): Promise<string[]> {
 interface ImportRow extends Record<string, unknown> {
   /** Línea del CSV, sólo para que los errores se puedan localizar en el archivo. */
   line?: unknown
+}
+
+/** Tope de portadas copiadas por subida: son descargas y suben al store. */
+const COVER_MAX_COPIES = 20
+
+async function copyCovers(pending: { id: string; url: string }[]): Promise<void> {
+  const batch = pending.slice(0, COVER_MAX_COPIES)
+  for (let start = 0; start < batch.length; start += LASTFM_BATCH) {
+    await Promise.all(
+      batch
+        .slice(start, start + LASTFM_BATCH)
+        .map((cover) => importCoverFromLastfm(cover.id, cover.url)),
+    )
+  }
 }
 
 /**
@@ -184,12 +207,13 @@ releasesRouter.post("/importar", writeRateLimit, requireAdmin, async (req, res) 
   }
 
   // Antes de validar: lo que Last.fm pueda aportar cuenta como dato del archivo.
-  const lastfmIssues = await fillFromLastfm(rows as ImportRow[])
+  const covers = new Map<ImportRow, string>()
+  const lastfmIssues = await fillFromLastfm(rows as ImportRow[], covers)
   if (lastfmIssues.length > 0) throw new ValidationError(lastfmIssues)
 
   const issues: string[] = []
-  const updates: { id: string; changes: Partial<Release>; where: string }[] = []
-  const creations: { draft: Omit<Release, "id">; where: string }[] = []
+  const updates: { id: string; changes: Partial<Release>; where: string; cover?: string }[] = []
+  const creations: { draft: Omit<Release, "id">; where: string; cover?: string }[] = []
   const deletions: { id: string; where: string }[] = []
   const seen = new Set<string>()
 
@@ -234,6 +258,7 @@ releasesRouter.post("/importar", writeRateLimit, requireAdmin, async (req, res) 
 
       if (isNewRow) {
         creations.push({
+          cover: covers.get(entry),
           draft: { ...fields, tracklist: fields.tracklist ?? [] } as Release,
           where,
         })
@@ -250,7 +275,7 @@ releasesRouter.post("/importar", writeRateLimit, requireAdmin, async (req, res) 
         issues.push(`${where}: no trae ningún dato que cambiar`)
         return
       }
-      updates.push({ id, changes: fields, where })
+      updates.push({ id, changes: fields, where, cover: covers.get(entry) })
     } catch (error) {
       if (!(error instanceof ValidationError)) throw error
       for (const issue of error.issues) issues.push(`${where}: ${issue}`)
@@ -261,6 +286,8 @@ releasesRouter.post("/importar", writeRateLimit, requireAdmin, async (req, res) 
 
   // Se recogen aquí y se borran del store al terminar, ya con la base consistente.
   const orphans: string[] = []
+  // Las portadas se copian fuera de la transacción: son un extra y pueden fallar.
+  const pendingCovers: { id: string; url: string }[] = []
 
   const result = await transaction(async (tx) => {
     const missing: string[] = []
@@ -286,11 +313,16 @@ releasesRouter.post("/importar", writeRateLimit, requireAdmin, async (req, res) 
 
     const keep = updates.map((update) => update.id)
 
+    for (const update of updates) {
+      if (update.cover) pendingCovers.push({ id: update.id, url: update.cover })
+    }
+
     for (const creation of creations) {
       const base = slugify(creation.draft.artist, creation.draft.title) || `disco-${Date.now()}`
       const id = (await releaseExists(base, tx)) ? `${base}-${Date.now().toString(36)}` : base
       await createRelease({ ...creation.draft, id }, tx)
       keep.push(id)
+      if (creation.cover) pendingCovers.push({ id, url: creation.cover })
     }
 
     // Con sincronizar, el archivo es la foto completa: lo que ya no aparece se oculta.
@@ -305,6 +337,7 @@ releasesRouter.post("/importar", writeRateLimit, requireAdmin, async (req, res) 
   })
 
   await deleteStoredImages(orphans)
+  await copyCovers(pendingCovers)
   res.json(result)
 })
 
@@ -438,8 +471,49 @@ releasesRouter.post("/", writeRateLimit, requireAdmin, async (req: Request, res:
     tracklist: parsed.tracklist ?? [],
   }
 
-  res.status(201).json(await createRelease(release))
+  const created = await createRelease(release)
+
+  // El alta responde con lo que ya existe; la portada se copia sin bloquear el
+  // resultado, y si falla el disco queda listo para subirle una a mano.
+  if (created.lastfmUrl && isLastfmConfigured()) {
+    const album = await fetchAlbumByUrl(created.lastfmUrl).catch(() => null)
+    const image = await importCoverFromLastfm(created.id, album?.imageUrl ?? null)
+    if (image) created.images = [image]
+  }
+
+  res.status(201).json(created)
 })
+
+/** Copia la portada de Last.fm a un disco que ya existe y no tiene fotos. */
+releasesRouter.post(
+  "/:id/imagenes/lastfm",
+  writeRateLimit,
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    const id = param(req, "id")
+    const release = await getRelease(id)
+    if (!release) {
+      res.status(404).json({ error: "Disco no encontrado" })
+      return
+    }
+    if (!release.lastfmUrl) {
+      throw new ValidationError(["Este disco no tiene ficha de Last.fm"])
+    }
+    if (release.images.length > 0) {
+      res.status(409).json({ error: "El disco ya tiene fotos" })
+      return
+    }
+
+    const album = await fetchAlbumByUrl(release.lastfmUrl)
+    const image = await importCoverFromLastfm(id, album?.imageUrl ?? null)
+    if (!image) {
+      res.status(404).json({ error: "Last.fm no tiene portada para este álbum" })
+      return
+    }
+
+    res.status(201).json({ items: await listImages(id) })
+  },
+)
 
 releasesRouter.patch("/:id", writeRateLimit, requireAdmin, async (req: Request, res: Response) => {
   const parsed = parseReleaseBody(req.body ?? {}, true)

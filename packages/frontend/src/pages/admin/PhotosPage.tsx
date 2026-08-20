@@ -67,6 +67,7 @@ export function PhotosPage() {
                 releaseId={release.id}
                 images={uploaded[release.id] ?? []}
                 label={`${release.artist} — ${release.title}`}
+                lastfmUrl={release.lastfmUrl}
                 onChange={(images) =>
                   setUploaded((current) => ({ ...current, [release.id]: images }))
                 }

@@ -70,6 +70,14 @@ export function uploadImage(releaseId: string, file: Blob, name: string): Promis
   )
 }
 
+/** Copia al catálogo la portada que publica Last.fm para ese disco. */
+export function importLastfmCover(releaseId: string): Promise<ImageList> {
+  return request<ImageList>(`/api/releases/${encodeURIComponent(releaseId)}/imagenes/lastfm`, {
+    method: "POST",
+    auth: true,
+  })
+}
+
 export function setPrimaryImage(releaseId: string, imageId: string): Promise<ImageList> {
   return request<ImageList>(
     `/api/releases/${encodeURIComponent(releaseId)}/imagenes/${encodeURIComponent(imageId)}/principal`,

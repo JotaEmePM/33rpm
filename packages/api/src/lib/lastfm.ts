@@ -21,7 +21,7 @@ export interface AlbumInfo {
   tracklist: AlbumTrack[]
   /** Etiquetas de Last.fm, por si alguna sirve de género. */
   tags: string[]
-  /** Portada más grande que ofrezca Last.fm, si la hay. */
+  /** Portada de Last.fm en el tamaño que copia la tienda, si la hay. */
   imageUrl: string | null
 }
 
@@ -49,6 +49,24 @@ export function parseAlbumUrl(raw: string): { artist: string; album: string } {
   // Last.fm escribe los espacios como "+" dentro del path.
   const decode = (part: string) => decodeURIComponent(part.replace(/\+/g, " "))
   return { artist: decode(artist), album: decode(album) }
+}
+
+/**
+ * Tamaño de portada que se copia al catálogo. `large` son 174x174; `extralarge`
+ * y `mega` son la misma imagen más grande, y sirven cambiando esta constante.
+ */
+const COVER_SIZE = "large"
+
+/** Last.fm devuelve siempre esta imagen cuando el álbum no tiene portada. */
+const PLACEHOLDER = "2a96cbd8b46e442fc41c2b86b821562f"
+
+function pickCover(images: { "#text"?: string; size?: string }[]): string {
+  const preferred = [COVER_SIZE, "extralarge", "mega"]
+  for (const size of preferred) {
+    const url = images.find((image) => image.size === size)?.["#text"]
+    if (url && !url.includes(PLACEHOLDER)) return url
+  }
+  return ""
 }
 
 function seconds(value: unknown): string {
@@ -101,11 +119,7 @@ export async function fetchAlbumInfo(artist: string, album: string): Promise<Alb
   const rawTracks = data.tracks?.track
   const tracks = Array.isArray(rawTracks) ? rawTracks : rawTracks ? [rawTracks] : []
 
-  const images = data.image ?? []
-  const cover =
-    images.find((image) => image.size === "mega")?.["#text"] ||
-    images.find((image) => image.size === "extralarge")?.["#text"] ||
-    ""
+  const cover = pickCover(data.image ?? [])
 
   return {
     artist: data.artist ?? artist,

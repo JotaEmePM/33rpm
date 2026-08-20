@@ -84,6 +84,7 @@ export function EditProductPage() {
                 releaseId={id}
                 images={images}
                 label={`${release.artist} — ${release.title}`}
+                lastfmUrl={release.lastfmUrl}
                 onChange={setImages}
               />
             </section>
