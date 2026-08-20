@@ -72,6 +72,9 @@ export const env = {
     process.env.MP_NOTIFICATION_URL ??
     `${process.env.APP_URL ?? "http://localhost:5174"}/api/pagos/webhook`,
 
+  /** Last.fm: sólo lectura pública (album.getInfo), no necesita el shared secret. */
+  lastfmApiKey: process.env.LASTFM_API_KEY,
+
   /** Correos que reciben rol admin la primera vez que entran. */
   adminEmails: list("ADMIN_EMAILS", ""),
 

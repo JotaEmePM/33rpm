@@ -1,5 +1,7 @@
-import type { FormEvent } from "react"
-import type { Release } from "../../types"
+import { type FormEvent, useRef, useState } from "react"
+import { ApiError } from "../../api/client"
+import { fetchAlbumInfo } from "../../api/lastfm"
+import type { Release, Track } from "../../types"
 import { Button } from "../ui/Button"
 import { Field } from "../ui/Field"
 import { Select } from "../ui/Select"
@@ -20,6 +22,8 @@ interface ProductFormProps {
   /** Con un disco, el formulario edita en vez de dar de alta. */
   release?: Release
   submitLabel?: string
+  /** Las pistas traídas de Last.fm: el formulario no las edita, sólo las carga. */
+  onTracklist?: (tracklist: Track[]) => void
 }
 
 export function ProductForm({
@@ -31,9 +35,82 @@ export function ProductForm({
   onSubmit,
   release,
   submitLabel = "Guardar disco",
+  onTracklist,
 }: ProductFormProps) {
+  const formRef = useRef<HTMLFormElement>(null)
+  const [lookingUp, setLookingUp] = useState(false)
+  const [lastfmMessage, setLastfmMessage] = useState<string | null>(null)
+
+  function setValue(name: string, value: string) {
+    const field = formRef.current?.elements.namedItem(name)
+    if (field instanceof HTMLInputElement || field instanceof HTMLSelectElement) {
+      field.value = value
+    }
+  }
+
+  async function handleLastfm() {
+    const field = formRef.current?.elements.namedItem("lastfmUrl")
+    const url = field instanceof HTMLInputElement ? field.value.trim() : ""
+    if (!url) {
+      setLastfmMessage("Pega antes la URL del álbum en Last.fm")
+      return
+    }
+
+    setLookingUp(true)
+    setLastfmMessage(null)
+    try {
+      const album = await fetchAlbumInfo(url)
+      setValue("artist", album.artist)
+      setValue("title", album.title)
+
+      // El género sólo se toca si alguna etiqueta coincide con las de la tienda.
+      const match = album.tags.find((tag) =>
+        genres.some((genre) => genre.toLowerCase() === tag.toLowerCase()),
+      )
+      if (match) {
+        setValue("genre", genres.find((genre) => genre.toLowerCase() === match.toLowerCase()) ?? "")
+      }
+
+      onTracklist?.(album.tracklist)
+      setLastfmMessage(
+        `${album.artist} — ${album.title}${
+          album.tracklist.length > 0 ? ` · ${album.tracklist.length} pistas cargadas` : ""
+        }`,
+      )
+    } catch (error) {
+      setLastfmMessage(error instanceof ApiError ? error.message : "No pudimos consultar Last.fm")
+    } finally {
+      setLookingUp(false)
+    }
+  }
+
   return (
-    <form onSubmit={onSubmit} className="flex max-w-3xl flex-col gap-8">
+    <form ref={formRef} onSubmit={onSubmit} className="flex max-w-3xl flex-col gap-8">
+      <fieldset className="flex flex-col gap-4">
+        <legend className="font-display text-2xl uppercase">Desde Last.fm</legend>
+        <p className="text-sm text-muted">
+          Pega la dirección del álbum en Last.fm y rellenamos artista, título y la lista de pistas.
+          Lo que escribas a mano manda sobre lo que traiga.
+        </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <Field
+            label="URL del álbum"
+            name="lastfmUrl"
+            required={false}
+            defaultValue={release?.lastfmUrl ?? undefined}
+            className="flex-1"
+          />
+          <Button variant="outline" onClick={handleLastfm} disabled={lookingUp}>
+            {lookingUp ? "Buscando…" : "Traer datos"}
+          </Button>
+        </div>
+        {lastfmMessage ? (
+          <p className="border-2 border-ash p-3 text-sm text-muted" role="status">
+            {lastfmMessage}
+          </p>
+        ) : null}
+      </fieldset>
+
       <fieldset className="flex flex-col gap-4">
         <legend className="font-display text-2xl uppercase">Ficha</legend>
         <div className="grid gap-4 sm:grid-cols-2">

@@ -12,6 +12,7 @@ import {
   globalRateLimit,
   securityHeaders,
 } from "./middleware/security.js"
+import { lastfmRouter } from "./routes/lastfm.js"
 import { metaRouter } from "./routes/meta.js"
 import { newsletterRouter } from "./routes/newsletter.js"
 import { ordersRouter } from "./routes/orders.js"
@@ -53,6 +54,7 @@ export function configureApp(app: Express): Express {
   app.use("/api/orders", ordersRouter)
   app.use("/api/pagos", paymentsRouter)
   app.use("/api/meta", metaRouter)
+  app.use("/api/lastfm", lastfmRouter)
   app.use("/api/newsletter", newsletterRouter)
   app.use("/api/lista-deseos", wishlistRouter)
 

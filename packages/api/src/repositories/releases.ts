@@ -17,6 +17,7 @@ interface ReleaseRow {
   is_preorder: number
   is_featured: number
   visible: number
+  lastfm_url: string | null
 }
 
 interface TrackRow {
@@ -49,6 +50,7 @@ function toRelease(row: ReleaseRow, tracklist: Track[], images: ReleaseImage[] =
     isPreorder: int(row.is_preorder) === 1,
     isFeatured: int(row.is_featured) === 1,
     visible: int(row.visible) === 1,
+    lastfmUrl: row.lastfm_url,
     images,
     tracklist,
   }
@@ -191,8 +193,8 @@ export async function createRelease(release: Release, on?: Executor): Promise<Re
 
   await run(
     `INSERT INTO releases (id, artist, title, year, genre, label, format, condition, price, stock,
-                           is_new, is_preorder, is_featured, visible)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                           is_new, is_preorder, is_featured, visible, lastfm_url)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       release.id,
       release.artist,
@@ -208,6 +210,7 @@ export async function createRelease(release: Release, on?: Executor): Promise<Re
       release.isPreorder ? 1 : 0,
       release.isFeatured ? 1 : 0,
       release.visible === false ? 0 : 1,
+      release.lastfmUrl ?? null,
     ],
     on,
   )
@@ -230,7 +233,8 @@ export async function updateRelease(
   await run(
     `UPDATE releases
      SET artist = ?, title = ?, year = ?, genre = ?, label = ?, format = ?, condition = ?,
-         price = ?, stock = ?, is_new = ?, is_preorder = ?, is_featured = ?, visible = ?
+         price = ?, stock = ?, is_new = ?, is_preorder = ?, is_featured = ?, visible = ?,
+         lastfm_url = ?
      WHERE id = ?`,
     [
       next.artist,
@@ -246,6 +250,7 @@ export async function updateRelease(
       next.isPreorder ? 1 : 0,
       next.isFeatured ? 1 : 0,
       next.visible ? 1 : 0,
+      next.lastfmUrl ?? null,
       id,
     ],
     on,

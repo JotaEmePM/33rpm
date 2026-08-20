@@ -5,12 +5,15 @@ import { createRelease } from "../../api/releases"
 import { AdminHeader } from "../../components/admin/AdminHeader"
 import { ProductForm } from "../../components/admin/ProductForm"
 import { useMeta } from "../../hooks/useMeta"
+import type { Track } from "../../types"
 
 export function NewProductPage() {
   const navigate = useNavigate()
   const meta = useMeta()
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Las pistas no se escriben a mano: llegan de Last.fm.
+  const [tracklist, setTracklist] = useState<Track[]>([])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -32,7 +35,8 @@ export function NewProductPage() {
         isNew: form.get("isNew") === "on",
         isPreorder: form.get("isPreorder") === "on",
         isFeatured: form.get("isFeatured") === "on",
-        tracklist: [],
+        lastfmUrl: String(form.get("lastfmUrl") ?? "") || null,
+        tracklist,
       })
 
       navigate("/admin/productos")
@@ -58,6 +62,7 @@ export function NewProductPage() {
           submitting={submitting}
           error={error}
           onSubmit={handleSubmit}
+          onTracklist={setTracklist}
         />
       </section>
     </>

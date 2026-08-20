@@ -13,6 +13,7 @@ export async function seed(): Promise<void> {
           ...release,
           visible: true,
           images: [],
+          lastfmUrl: null,
           // Los cuatro primeros llenan la portada y uno va en preventa: sin esto
           // las dos marcas no se verían nunca en una tienda recién sembrada.
           isFeatured: index < 4,

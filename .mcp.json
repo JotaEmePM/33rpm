@@ -1,0 +1,23 @@
+{
+  "mcpServers": {
+    "better-auth": {
+      "type": "http",
+      "url": "https://mcp.better-auth.com/mcp"
+    },
+    "resend": {
+      "type": "http",
+      "url": "https://mcp.resend.com/mcp"
+    },
+    "vercel": {
+      "type": "http",
+      "url": "https://mcp.vercel.com"
+    },
+    "mercadopago": {
+      "type": "http",
+      "url": "https://mcp.mercadopago.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${MP_ACCESS_TOKEN}"
+      }
+    }
+  }
+}

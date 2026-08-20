@@ -87,12 +87,13 @@ export function deleteImage(releaseId: string, imageId: string): Promise<ImageLi
 /** El alta no lleva fotos: se suben después, cuando el disco ya existe. */
 export type ReleaseDraft = Omit<
   Release,
-  "id" | "visible" | "isPreorder" | "isFeatured" | "images"
+  "id" | "visible" | "isPreorder" | "isFeatured" | "images" | "lastfmUrl"
 > & {
   id?: string
   visible?: boolean
   isPreorder?: boolean
   isFeatured?: boolean
+  lastfmUrl?: string | null
 }
 
 export function createRelease(draft: ReleaseDraft): Promise<Release> {

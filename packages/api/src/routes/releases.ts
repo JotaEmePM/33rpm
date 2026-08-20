@@ -8,6 +8,7 @@ import {
   storeImage,
 } from "../lib/blob.js"
 import { param } from "../lib/http.js"
+import { fetchAlbumByUrl, isLastfmConfigured } from "../lib/lastfm.js"
 import { CONDITIONS, FORMATS, slugify, ValidationError, Validator } from "../lib/validation.js"
 import { requireAdmin } from "../middleware/require-auth.js"
 import { writeRateLimit } from "../middleware/security.js"
@@ -91,6 +92,7 @@ function parseReleaseBody(body: Record<string, unknown>, partial: boolean) {
     isPreorder: body.isPreorder === undefined ? undefined : validator.boolean("isPreorder"),
     isFeatured: body.isFeatured === undefined ? undefined : validator.boolean("isFeatured"),
     visible: body.visible === undefined ? undefined : validator.boolean("visible"),
+    lastfmUrl: validator.string("lastfmUrl", { required: false, max: 300 }),
   }
   validator.done()
 
@@ -100,6 +102,60 @@ function parseReleaseBody(body: Record<string, unknown>, partial: boolean) {
 
 /** Máximo de filas por archivo: pasado eso, el cuerpo no cabe en el límite de express.json. */
 const IMPORT_MAX_ROWS = 1000
+
+/** Tope de consultas a Last.fm por subida, para no agotar el tiempo de la función. */
+const LASTFM_MAX_LOOKUPS = 40
+const LASTFM_BATCH = 4
+
+/**
+ * Completa desde Last.fm lo que el archivo no traiga: artista, título y
+ * tracklist. Lo que venga escrito en el CSV manda, porque es la decisión de la
+ * tienda; Last.fm sólo rellena huecos.
+ */
+async function fillFromLastfm(rows: ImportRow[]): Promise<string[]> {
+  const pending = rows.filter(
+    (row) => typeof row.lastfmUrl === "string" && row.lastfmUrl.trim().length > 0,
+  )
+  if (pending.length === 0) return []
+  if (!isLastfmConfigured()) return ["Last.fm no está configurado y el archivo trae fichas"]
+  if (pending.length > LASTFM_MAX_LOOKUPS) {
+    return [
+      `El archivo trae ${pending.length} fichas de Last.fm y el máximo por subida es ${LASTFM_MAX_LOOKUPS}`,
+    ]
+  }
+
+  const issues: string[] = []
+
+  for (let start = 0; start < pending.length; start += LASTFM_BATCH) {
+    await Promise.all(
+      pending.slice(start, start + LASTFM_BATCH).map(async (row) => {
+        const where = `Fila ${Number(row.line) || "?"}`
+        try {
+          const album = await fetchAlbumByUrl(String(row.lastfmUrl))
+          if (!album) {
+            issues.push(`${where}: Last.fm no conoce ese álbum`)
+            return
+          }
+          if (row.artist === undefined) row.artist = album.artist
+          if (row.title === undefined) row.title = album.title
+          if (row.tracklist === undefined && album.tracklist.length > 0) {
+            row.tracklist = album.tracklist
+          }
+        } catch (error) {
+          issues.push(
+            `${where}: ${
+              error instanceof ValidationError
+                ? error.issues.join(", ")
+                : "no se pudo consultar Last.fm"
+            }`,
+          )
+        }
+      }),
+    )
+  }
+
+  return issues
+}
 
 interface ImportRow extends Record<string, unknown> {
   /** Línea del CSV, sólo para que los errores se puedan localizar en el archivo. */
@@ -126,6 +182,10 @@ releasesRouter.post("/importar", writeRateLimit, requireAdmin, async (req, res) 
   if (rows.length > IMPORT_MAX_ROWS) {
     throw new ValidationError([`El archivo no puede traer más de ${IMPORT_MAX_ROWS} filas`])
   }
+
+  // Antes de validar: lo que Last.fm pueda aportar cuenta como dato del archivo.
+  const lastfmIssues = await fillFromLastfm(rows as ImportRow[])
+  if (lastfmIssues.length > 0) throw new ValidationError(lastfmIssues)
 
   const issues: string[] = []
   const updates: { id: string; changes: Partial<Release>; where: string }[] = []
@@ -373,6 +433,7 @@ releasesRouter.post("/", writeRateLimit, requireAdmin, async (req: Request, res:
     isPreorder: parsed.isPreorder ?? false,
     isFeatured: parsed.isFeatured ?? false,
     visible: parsed.visible ?? true,
+    lastfmUrl: parsed.lastfmUrl ?? null,
     images: [],
     tracklist: parsed.tracklist ?? [],
   }

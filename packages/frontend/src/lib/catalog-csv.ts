@@ -21,6 +21,7 @@ const COLUMNS = [
   { header: "preventa", field: "isPreorder", type: "siNo" },
   { header: "destacado", field: "isFeatured", type: "siNo" },
   { header: "visible", field: "visible", type: "siNo" },
+  { header: "lastfm", field: "lastfmUrl", type: "text" },
 ] as const
 
 export const CATALOG_CSV_HEADERS = COLUMNS.map((column) => column.header)

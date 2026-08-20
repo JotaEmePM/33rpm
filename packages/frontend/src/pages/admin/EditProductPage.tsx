@@ -8,7 +8,7 @@ import { ProductForm } from "../../components/admin/ProductForm"
 import { ErrorState, LoadingState } from "../../components/ui/StateMessage"
 import { useMeta } from "../../hooks/useMeta"
 import { useRelease } from "../../hooks/useReleases"
-import type { ReleaseImage } from "../../types"
+import type { ReleaseImage, Track } from "../../types"
 
 export function EditProductPage() {
   const { id } = useParams()
@@ -18,6 +18,8 @@ export function EditProductPage() {
   const [images, setImages] = useState<ReleaseImage[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  // Sólo se manda si Last.fm trajo pistas nuevas: si no, las de siempre.
+  const [tracklist, setTracklist] = useState<Track[] | null>(null)
 
   // Las fotos se editan aparte del formulario: cada cambio ya viajó al API.
   useEffect(() => {
@@ -45,6 +47,8 @@ export function EditProductPage() {
         isNew: form.get("isNew") === "on",
         isPreorder: form.get("isPreorder") === "on",
         isFeatured: form.get("isFeatured") === "on",
+        lastfmUrl: String(form.get("lastfmUrl") ?? "") || null,
+        ...(tracklist ? { tracklist } : {}),
       })
       navigate("/admin/productos")
     } catch (caught) {
@@ -93,6 +97,7 @@ export function EditProductPage() {
               onSubmit={handleSubmit}
               release={release}
               submitLabel="Guardar cambios"
+              onTracklist={setTracklist}
             />
           </>
         ) : null}

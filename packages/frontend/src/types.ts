@@ -36,6 +36,8 @@ export interface Release {
   isFeatured: boolean
   /** Un disco no visible sigue en el catálogo pero no se muestra en la tienda. */
   visible: boolean
+  /** Ficha del álbum en Last.fm, de donde se copian pistas y datos. */
+  lastfmUrl: string | null
   /** En los listados llega sólo la principal; en la ficha, todas. */
   images: ReleaseImage[]
   tracklist: Track[]
