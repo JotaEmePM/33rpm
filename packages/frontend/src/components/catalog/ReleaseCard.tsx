@@ -46,9 +46,12 @@ export function ReleaseCard({ release, animated = false }: ReleaseCardProps) {
             title={release.title}
             viewTransitionName={isOpening ? `sleeve-${release.id}` : undefined}
           />
-          {release.isNew ? (
-            <span className="label absolute left-0 top-0 bg-volt px-2 py-1 text-ink">Nuevo</span>
-          ) : null}
+          {/* Las marcas se apilan para que ninguna tape a otra sobre la carátula. */}
+          <div className="absolute left-0 top-0 flex flex-col items-start gap-1">
+            {release.isPreorder ? <Badge tone="paper">Preventa</Badge> : null}
+            {release.isNew ? <Badge tone="volt">Nuevo</Badge> : null}
+            {release.isFeatured ? <Badge tone="ink">Destacado</Badge> : null}
+          </div>
           {soldOut ? (
             <span className="label absolute inset-x-0 bottom-0 bg-ink/90 py-2 text-center text-paper">
               Agotado

@@ -12,7 +12,11 @@ export function HomePage() {
   const navigate = useNavigate()
   const meta = useMeta()
   const arrivals = useReleases({ onlyNew: true, pageSize: 4 })
+  // El carrusel es de discos destacados; mientras no haya ninguno marcado,
+  // la portada sigue enseñando lo último que llegó en vez de quedarse vacía.
+  const featured = useReleases({ onlyFeatured: true, pageSize: 8 })
   const bestSellers = useReleases({ sort: "recientes", pageSize: 8 })
+  const highlights = featured.data?.items ?? []
 
   return (
     <>
@@ -43,7 +47,9 @@ export function HomePage() {
         <NewReleases releases={arrivals.data.items} total={arrivals.data.total} />
       ) : null}
 
-      {bestSellers.data && bestSellers.data.items.length > 0 ? (
+      {highlights.length > 0 ? (
+        <BestSellers releases={highlights} title="Destacados" aside="Elegidos por el equipo" />
+      ) : bestSellers.data && bestSellers.data.items.length > 0 ? (
         <BestSellers releases={bestSellers.data.items} />
       ) : null}
 

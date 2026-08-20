@@ -22,6 +22,12 @@ export interface Release {
   stock: number
   /** Entró al catálogo en el último drop semanal. */
   isNew: boolean
+  /** Anunciado antes de llegar a la tienda. */
+  isPreorder: boolean
+  /** Elegido para la portada. */
+  isFeatured: boolean
+  /** Un disco no visible sigue en el catálogo pero no se muestra en la tienda. */
+  visible: boolean
   tracklist: Track[]
 }
 

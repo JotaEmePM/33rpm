@@ -4,6 +4,7 @@ export interface CatalogFilters {
   formats: string[]
   conditions: string[]
   onlyInStock: boolean
+  onlyPreorder: boolean
 }
 
 interface FilterPanelProps {
@@ -54,15 +55,27 @@ export function FilterPanel({
         }
       />
 
-      <label className="flex min-h-11 cursor-pointer items-center gap-3 border-t border-ash pt-4 text-sm">
-        <input
-          type="checkbox"
-          checked={filters.onlyInStock}
-          onChange={() => onChange({ ...filters, onlyInStock: !filters.onlyInStock })}
-          className="size-4 shrink-0 appearance-none border-2 border-steel checked:border-volt checked:bg-volt"
-        />
-        Solo con stock
-      </label>
+      <div className="flex flex-col border-t border-ash pt-4">
+        <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
+          <input
+            type="checkbox"
+            checked={filters.onlyInStock}
+            onChange={() => onChange({ ...filters, onlyInStock: !filters.onlyInStock })}
+            className="size-4 shrink-0 appearance-none border-2 border-steel checked:border-volt checked:bg-volt"
+          />
+          Solo con stock
+        </label>
+
+        <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
+          <input
+            type="checkbox"
+            checked={filters.onlyPreorder}
+            onChange={() => onChange({ ...filters, onlyPreorder: !filters.onlyPreorder })}
+            className="size-4 shrink-0 appearance-none border-2 border-steel checked:border-volt checked:bg-volt"
+          />
+          Solo preventa
+        </label>
+      </div>
     </aside>
   )
 }

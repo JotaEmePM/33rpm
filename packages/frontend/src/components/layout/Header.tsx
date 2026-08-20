@@ -6,6 +6,7 @@ import { SearchField } from "./SearchField"
 const NAV = [
   { to: "/catalogo", label: "Catálogo" },
   { to: "/catalogo?novedad=1", label: "Novedades" },
+  { to: "/catalogo?preventa=1", label: "Preventa" },
   { to: "/catalogo?estado=Usado", label: "Usados" },
 ]
 
@@ -40,7 +41,7 @@ export function Header() {
         </nav>
 
         <div className="flex items-center gap-3 border-l-0 px-3 py-2 sm:border-l-2 sm:border-paper">
-          <SearchField className="hidden w-56 lg:flex" />
+          <SearchField className="hidden lg:flex lg:w-80 xl:w-[28rem]" />
           <AccountButton />
           <CartButton />
         </div>

@@ -6,9 +6,10 @@ const COLUMNS = ["Disco", "Sello", "Formato", "Estado", "Precio", "Stock", ""]
 interface ProductTableProps {
   releases: Release[]
   onDelete: (id: string) => void
+  onToggleVisible: (release: Release) => void
 }
 
-export function ProductTable({ releases, onDelete }: ProductTableProps) {
+export function ProductTable({ releases, onDelete, onToggleVisible }: ProductTableProps) {
   return (
     <div className="overflow-x-auto border-2 border-ash">
       <table className="w-full min-w-3xl border-collapse text-left">
@@ -27,7 +28,12 @@ export function ProductTable({ releases, onDelete }: ProductTableProps) {
         </thead>
         <tbody>
           {releases.map((release) => (
-            <ProductRow key={release.id} release={release} onDelete={onDelete} />
+            <ProductRow
+              onToggleVisible={onToggleVisible}
+              key={release.id}
+              release={release}
+              onDelete={onDelete}
+            />
           ))}
         </tbody>
       </table>

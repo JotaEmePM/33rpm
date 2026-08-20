@@ -13,6 +13,9 @@ interface ReleaseRow {
   price: number
   stock: number
   is_new: number
+  is_preorder: number
+  is_featured: number
+  visible: number
 }
 
 interface TrackRow {
@@ -42,6 +45,9 @@ function toRelease(row: ReleaseRow, tracklist: Track[]): Release {
     price: int(row.price),
     stock: int(row.stock),
     isNew: int(row.is_new) === 1,
+    isPreorder: int(row.is_preorder) === 1,
+    isFeatured: int(row.is_featured) === 1,
+    visible: int(row.visible) === 1,
     tracklist,
   }
 }
@@ -94,6 +100,10 @@ export async function listReleases(
   }
   if (query.onlyInStock) where.push("r.stock > 0")
   if (query.onlyNew) where.push("r.is_new = 1")
+  if (query.onlyPreorder) where.push("r.is_preorder = 1")
+  if (query.onlyFeatured) where.push("r.is_featured = 1")
+  // Los ocultos sólo salen si quien pregunta lo pide expresamente.
+  if (!query.includeHidden) where.push("r.visible = 1")
 
   const whereSql = where.length > 0 ? `WHERE ${where.join(" AND ")}` : ""
   const orderSql = SORT_SQL[query.sort ?? "recientes"]
@@ -142,8 +152,9 @@ export async function createRelease(release: Release, on?: Executor): Promise<Re
   if (!on) return transaction((tx) => createRelease(release, tx))
 
   await run(
-    `INSERT INTO releases (id, artist, title, year, genre, label, format, condition, price, stock, is_new)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO releases (id, artist, title, year, genre, label, format, condition, price, stock,
+                           is_new, is_preorder, is_featured, visible)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       release.id,
       release.artist,
@@ -156,6 +167,9 @@ export async function createRelease(release: Release, on?: Executor): Promise<Re
       release.price,
       release.stock,
       release.isNew ? 1 : 0,
+      release.isPreorder ? 1 : 0,
+      release.isFeatured ? 1 : 0,
+      release.visible === false ? 0 : 1,
     ],
     on,
   )
@@ -178,7 +192,7 @@ export async function updateRelease(
   await run(
     `UPDATE releases
      SET artist = ?, title = ?, year = ?, genre = ?, label = ?, format = ?, condition = ?,
-         price = ?, stock = ?, is_new = ?
+         price = ?, stock = ?, is_new = ?, is_preorder = ?, is_featured = ?, visible = ?
      WHERE id = ?`,
     [
       next.artist,
@@ -191,6 +205,9 @@ export async function updateRelease(
       next.price,
       next.stock,
       next.isNew ? 1 : 0,
+      next.isPreorder ? 1 : 0,
+      next.isFeatured ? 1 : 0,
+      next.visible ? 1 : 0,
       id,
     ],
     on,
@@ -221,9 +238,33 @@ export async function decrementStock(
   return changes > 0
 }
 
+/**
+ * Oculta los discos que no estén en la lista y devuelve cuáles fueron.
+ * Es lo que aplica la importación: el archivo subido es la foto completa del
+ * catálogo, y lo que ya no aparece deja de mostrarse en la tienda.
+ */
+export async function hideMissing(keepIds: string[], on?: Executor): Promise<string[]> {
+  const placeholders = keepIds.map(() => "?").join(", ")
+  const filter = keepIds.length > 0 ? `AND id NOT IN (${placeholders})` : ""
+
+  const rows = await all<{ id: string }>(
+    `SELECT id FROM releases WHERE visible = 1 ${filter}`,
+    keepIds,
+    on,
+  )
+  if (rows.length === 0) return []
+
+  await run(
+    `UPDATE releases SET visible = 0 WHERE id IN (${rows.map(() => "?").join(", ")})`,
+    rows.map((row) => row.id),
+    on,
+  )
+  return rows.map((row) => row.id)
+}
+
 export async function listGenres(on?: Executor): Promise<string[]> {
   const rows = await all<{ genre: string }>(
-    "SELECT DISTINCT genre FROM releases ORDER BY genre COLLATE NOCASE",
+    "SELECT DISTINCT genre FROM releases WHERE visible = 1 ORDER BY genre COLLATE NOCASE",
     [],
     on,
   )
@@ -232,7 +273,7 @@ export async function listGenres(on?: Executor): Promise<string[]> {
 
 export async function listLabels(on?: Executor): Promise<string[]> {
   const rows = await all<{ label: string }>(
-    "SELECT DISTINCT label FROM releases ORDER BY label COLLATE NOCASE",
+    "SELECT DISTINCT label FROM releases WHERE visible = 1 ORDER BY label COLLATE NOCASE",
     [],
     on,
   )

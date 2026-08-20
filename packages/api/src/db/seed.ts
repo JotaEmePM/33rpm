@@ -7,8 +7,18 @@ export async function seed(): Promise<void> {
   if ((await countReleases()) > 0) return
 
   await transaction(async (tx) => {
-    for (const release of SEED_RELEASES) {
-      await createRelease(release, tx)
+    for (const [index, release] of SEED_RELEASES.entries()) {
+      await createRelease(
+        {
+          ...release,
+          visible: true,
+          // Los cuatro primeros llenan la portada y uno va en preventa: sin esto
+          // las dos marcas no se verían nunca en una tienda recién sembrada.
+          isFeatured: index < 4,
+          isPreorder: index === 4,
+        },
+        tx,
+      )
     }
   })
 

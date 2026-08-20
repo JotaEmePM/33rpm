@@ -25,6 +25,7 @@ export function CatalogPage() {
     formats: searchParams.get("formato")?.split(",").filter(Boolean) ?? [],
     conditions: conditionParam?.split(",").filter(Boolean) ?? [],
     onlyInStock: searchParams.get("stock") === "1",
+    onlyPreorder: searchParams.get("preventa") === "1",
   }
 
   const sort = (searchParams.get("orden") ?? "recientes") as SortOption
@@ -43,11 +44,14 @@ export function CatalogPage() {
     }
   }
 
-  const heading = onlyNew
-    ? "Recién llegados"
-    : conditionParam && !conditionParam.includes(",")
-      ? `Discos ${conditionParam}`
-      : "Catálogo"
+  const heading =
+    searchParams.get("preventa") === "1"
+      ? "Preventa"
+      : onlyNew
+        ? "Recién llegados"
+        : conditionParam && !conditionParam.includes(",")
+          ? `Discos ${conditionParam}`
+          : "Catálogo"
 
   return (
     <>
@@ -85,10 +89,15 @@ export function CatalogPage() {
               update((params) => {
                 setList(params, "formato", next.formats)
                 setList(params, "estado", next.conditions)
-                if (next.onlyInStock) {
-                  params.set("stock", "1")
-                } else {
-                  params.delete("stock")
+                for (const [key, active] of [
+                  ["stock", next.onlyInStock],
+                  ["preventa", next.onlyPreorder],
+                ] as const) {
+                  if (active) {
+                    params.set(key, "1")
+                  } else {
+                    params.delete(key)
+                  }
                 }
               })
             }

@@ -4,6 +4,7 @@ import { ReleaseCard } from "../components/catalog/ReleaseCard"
 import { AddToCartPanel } from "../components/product/AddToCartPanel"
 import { ReleaseMeta } from "../components/product/ReleaseMeta"
 import { Tracklist } from "../components/product/Tracklist"
+import { Badge } from "../components/ui/Badge"
 import { Sleeve } from "../components/ui/Sleeve"
 import { useReleases } from "../hooks/useReleases"
 import type { Release } from "../types"
@@ -48,6 +49,12 @@ export function ProductPage() {
 
         <div className="flex flex-col gap-6">
           <div>
+            {release.isPreorder || release.isFeatured ? (
+              <div className="mb-3 flex flex-wrap gap-2">
+                {release.isPreorder ? <Badge tone="paper">Preventa</Badge> : null}
+                {release.isFeatured ? <Badge tone="ink">Destacado</Badge> : null}
+              </div>
+            ) : null}
             <p className="label text-volt">{release.artist}</p>
             <h1 className="mt-2 font-display text-5xl uppercase leading-[0.9] sm:text-6xl">
               {release.title}

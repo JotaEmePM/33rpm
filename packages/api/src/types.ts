@@ -24,6 +24,12 @@ export interface Release {
   price: number
   stock: number
   isNew: boolean
+  /** Anunciado antes de llegar a la tienda. */
+  isPreorder: boolean
+  /** Elegido para la portada. */
+  isFeatured: boolean
+  /** Un disco no visible sigue en el catálogo pero no se muestra ni se vende. */
+  visible: boolean
   tracklist: Track[]
 }
 
@@ -34,6 +40,10 @@ export interface ReleaseQuery {
   conditions?: string[]
   onlyInStock?: boolean
   onlyNew?: boolean
+  onlyPreorder?: boolean
+  onlyFeatured?: boolean
+  /** Sólo la administración pide ver los discos ocultos. */
+  includeHidden?: boolean
   sort?: "recientes" | "precio-asc" | "precio-desc" | "artista"
   page: number
   pageSize: number

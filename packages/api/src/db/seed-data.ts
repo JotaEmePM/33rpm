@@ -1,10 +1,13 @@
 import type { Release } from "../types.js"
 
+/** El seed describe la ficha; visibilidad y marcas de venta las pone `seed()`. */
+export type SeedRelease = Omit<Release, "visible" | "isPreorder" | "isFeatured">
+
 /**
  * Catálogo inicial con el que se siembra la base la primera vez.
  * Artistas, títulos, sellos y precios son inventados: reemplazar por el catálogo real.
  */
-export const SEED_RELEASES: Release[] = [
+export const SEED_RELEASES: SeedRelease[] = [
   {
     id: "trepidacion-suburbio-norte",
     artist: "Trepidación",

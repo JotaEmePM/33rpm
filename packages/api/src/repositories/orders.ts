@@ -98,6 +98,11 @@ export async function createOrder(draft: OrderDraft, on?: Executor): Promise<Ord
     if (!release) {
       throw new OrderError(`El disco ${line.releaseId} no existe`, 404)
     }
+    if (!release.visible) {
+      throw new OrderError(`"${release.title}" ya no está disponible`, 409, {
+        releaseId: release.id,
+      })
+    }
     if (!(await decrementStock(release.id, line.quantity, on))) {
       throw new OrderError(`Stock insuficiente de "${release.title}"`, 409, {
         releaseId: release.id,

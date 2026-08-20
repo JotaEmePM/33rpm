@@ -30,6 +30,8 @@ export function NewProductPage() {
         price: Number(form.get("price")),
         stock: Number(form.get("stock") ?? 0),
         isNew: form.get("isNew") === "on",
+        isPreorder: form.get("isPreorder") === "on",
+        isFeatured: form.get("isFeatured") === "on",
         tracklist: [],
       })
 

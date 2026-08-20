@@ -1,5 +1,5 @@
 import { AUTH_SCHEMA_SQL } from "./auth-schema.js"
-import { client } from "./connection.js"
+import { all, client } from "./connection.js"
 
 /** DDL del catálogo. Única fuente de verdad: la usan el arranque local y la migración a Turso. */
 export const CATALOG_SCHEMA_SQL = `
@@ -15,6 +15,9 @@ export const CATALOG_SCHEMA_SQL = `
       price INTEGER NOT NULL,
       stock INTEGER NOT NULL DEFAULT 0,
       is_new INTEGER NOT NULL DEFAULT 0,
+      is_preorder INTEGER NOT NULL DEFAULT 0,
+      is_featured INTEGER NOT NULL DEFAULT 0,
+      visible INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -63,7 +66,17 @@ export const CATALOG_SCHEMA_SQL = `
     );
   `
 
+/** `CREATE TABLE IF NOT EXISTS` no toca las tablas ya creadas: las columnas nuevas se añaden aparte. */
+async function ensureColumn(table: string, column: string, definition: string): Promise<void> {
+  const columns = await all<{ name: string }>(`PRAGMA table_info(${table})`)
+  if (columns.some((existing) => existing.name === column)) return
+  await client.execute(`ALTER TABLE ${table} ADD COLUMN ${definition}`)
+}
+
 export async function migrate(): Promise<void> {
   await client.executeMultiple(AUTH_SCHEMA_SQL)
   await client.executeMultiple(CATALOG_SCHEMA_SQL)
+  await ensureColumn("releases", "visible", "visible INTEGER NOT NULL DEFAULT 1")
+  await ensureColumn("releases", "is_preorder", "is_preorder INTEGER NOT NULL DEFAULT 0")
+  await ensureColumn("releases", "is_featured", "is_featured INTEGER NOT NULL DEFAULT 0")
 }

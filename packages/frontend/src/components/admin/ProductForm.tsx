@@ -3,6 +3,12 @@ import { Button } from "../ui/Button"
 import { Field } from "../ui/Field"
 import { Select } from "../ui/Select"
 
+const MARKS = [
+  { name: "isNew", label: "Marcar como novedad del drop" },
+  { name: "isPreorder", label: "En preventa: anunciado antes de llegar a la tienda" },
+  { name: "isFeatured", label: "Destacado en la portada" },
+] as const
+
 interface ProductFormProps {
   genres: string[]
   formats: string[]
@@ -41,14 +47,19 @@ export function ProductForm({
           <Field label="Precio (CLP)" name="price" type="number" />
           <Field label="Stock" name="stock" type="number" />
         </div>
-        <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
-          <input
-            type="checkbox"
-            name="isNew"
-            className="size-4 shrink-0 appearance-none border-2 border-steel checked:border-volt checked:bg-volt"
-          />
-          Marcar como novedad del drop
-        </label>
+        {MARKS.map((mark) => (
+          <label
+            key={mark.name}
+            className="flex min-h-11 cursor-pointer items-center gap-3 text-sm"
+          >
+            <input
+              type="checkbox"
+              name={mark.name}
+              className="size-4 shrink-0 appearance-none border-2 border-steel checked:border-volt checked:bg-volt"
+            />
+            {mark.label}
+          </label>
+        ))}
       </fieldset>
 
       <fieldset className="flex flex-col gap-4">

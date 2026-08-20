@@ -1,4 +1,5 @@
 import { type Request, type Response, Router } from "express"
+import { transaction } from "../db/connection.js"
 import { param } from "../lib/http.js"
 import { CONDITIONS, FORMATS, slugify, ValidationError, Validator } from "../lib/validation.js"
 import { requireAdmin } from "../middleware/require-auth.js"
@@ -7,6 +8,7 @@ import {
   createRelease,
   deleteRelease,
   getRelease,
+  hideMissing,
   listReleases,
   releaseExists,
   updateRelease,
@@ -24,7 +26,8 @@ function asList(value: unknown): string[] | undefined {
 }
 
 function parseQuery(req: Request): ReleaseQuery {
-  const { q, genero, formato, estado, stock, novedad, orden, pagina, limite } = req.query
+  const { q, genero, formato, estado, stock, novedad, preventa, destacado, orden, pagina, limite } =
+    req.query
   const sort = SORTS.find((option) => option === orden) ?? "recientes"
 
   return {
@@ -34,9 +37,12 @@ function parseQuery(req: Request): ReleaseQuery {
     conditions: asList(estado),
     onlyInStock: stock === "1" || stock === "true",
     onlyNew: novedad === "1" || novedad === "true",
+    onlyPreorder: preventa === "1" || preventa === "true",
+    onlyFeatured: destacado === "1" || destacado === "true",
     sort,
     page: Math.max(1, Number(pagina) || 1),
     pageSize: Math.min(100, Math.max(1, Number(limite) || 24)),
+    includeHidden: req.query.ocultos === "1" && req.auth?.role === "admin",
   }
 }
 
@@ -73,12 +79,130 @@ function parseReleaseBody(body: Record<string, unknown>, partial: boolean) {
     price: validator.integer("price", { required, min: 0 }),
     stock: validator.integer("stock", { required: false, min: 0, max: 10_000 }),
     isNew: body.isNew === undefined ? undefined : validator.boolean("isNew"),
+    isPreorder: body.isPreorder === undefined ? undefined : validator.boolean("isPreorder"),
+    isFeatured: body.isFeatured === undefined ? undefined : validator.boolean("isFeatured"),
+    visible: body.visible === undefined ? undefined : validator.boolean("visible"),
   }
   validator.done()
 
   const tracklist = body.tracklist === undefined ? undefined : parseTracklist(body.tracklist)
   return { ...draft, tracklist }
 }
+
+/** Máximo de filas por archivo: pasado eso, el cuerpo no cabe en el límite de express.json. */
+const IMPORT_MAX_ROWS = 1000
+
+interface ImportRow extends Record<string, unknown> {
+  /** Línea del CSV, sólo para que los errores se puedan localizar en el archivo. */
+  line?: unknown
+}
+
+/**
+ * Importación en bloque desde el CSV del panel de administración.
+ *
+ * Es todo o nada: basta una fila mala para que no se aplique ninguna, así el
+ * catálogo nunca queda a medio actualizar. Con `sincronizar` el archivo se toma
+ * como la foto completa de la tienda y lo que no aparezca deja de mostrarse;
+ * sin él, una subida parcial sólo toca las filas que trae.
+ */
+releasesRouter.post("/importar", writeRateLimit, requireAdmin, async (req, res) => {
+  const rows = req.body?.items
+  // Ocultar lo que falta es destructivo: sólo se hace si quien sube el archivo lo pide.
+  const sync = req.body?.sincronizar === true
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new ValidationError(["El archivo no trae ninguna fila"])
+  }
+  if (rows.length > IMPORT_MAX_ROWS) {
+    throw new ValidationError([`El archivo no puede traer más de ${IMPORT_MAX_ROWS} filas`])
+  }
+
+  const issues: string[] = []
+  const updates: { id: string; changes: Partial<Release>; where: string }[] = []
+  const creations: { draft: Omit<Release, "id">; where: string }[] = []
+  const seen = new Set<string>()
+
+  rows.forEach((entry: ImportRow, index: number) => {
+    // La cabecera ocupa la línea 1: sin número propio, la primera fila es la 2.
+    const where = `Fila ${Number(entry?.line) || index + 2}`
+
+    if (typeof entry !== "object" || entry === null) {
+      issues.push(`${where}: no es una fila válida`)
+      return
+    }
+
+    const id = typeof entry.id === "string" ? entry.id.trim() : ""
+    const isNewRow = id.length === 0
+
+    // -1 en stock es el atajo para ocultar sin tener que tocar la columna visible;
+    // el stock real se conserva por si el disco vuelve a la tienda.
+    const row = Number(entry.stock) === -1 ? { ...entry, stock: undefined, visible: false } : entry
+
+    try {
+      // Alta: se exige todo. Edición: sólo lo que venga en el archivo.
+      const parsed = parseReleaseBody(row, !isNewRow)
+      const fields = Object.fromEntries(
+        Object.entries(parsed).filter(([, value]) => value !== undefined),
+      ) as Partial<Release>
+
+      if (isNewRow) {
+        creations.push({
+          draft: { ...fields, tracklist: fields.tracklist ?? [] } as Release,
+          where,
+        })
+        return
+      }
+
+      if (seen.has(id)) {
+        issues.push(`${where}: el id "${id}" está repetido en el archivo`)
+        return
+      }
+      seen.add(id)
+
+      if (Object.keys(fields).length === 0) {
+        issues.push(`${where}: no trae ningún dato que cambiar`)
+        return
+      }
+      updates.push({ id, changes: fields, where })
+    } catch (error) {
+      if (!(error instanceof ValidationError)) throw error
+      for (const issue of error.issues) issues.push(`${where}: ${issue}`)
+    }
+  })
+
+  if (issues.length > 0) throw new ValidationError(issues)
+
+  const result = await transaction(async (tx) => {
+    const missing: string[] = []
+
+    for (const update of updates) {
+      if (!(await updateRelease(update.id, update.changes, tx))) {
+        missing.push(`${update.where}: el disco "${update.id}" no existe en el catálogo`)
+      }
+    }
+    // Se comprueba después de intentarlo todo para devolver la lista completa de una vez.
+    if (missing.length > 0) throw new ValidationError(missing)
+
+    const keep = updates.map((update) => update.id)
+
+    for (const creation of creations) {
+      const base = slugify(creation.draft.artist, creation.draft.title) || `disco-${Date.now()}`
+      const id = (await releaseExists(base, tx)) ? `${base}-${Date.now().toString(36)}` : base
+      await createRelease({ ...creation.draft, id }, tx)
+      keep.push(id)
+    }
+
+    // Con sincronizar, el archivo es la foto completa: lo que ya no aparece se oculta.
+    const hidden = sync ? await hideMissing(keep, tx) : []
+
+    return {
+      actualizados: updates.length,
+      creados: creations.length,
+      ocultados: hidden.length,
+    }
+  })
+
+  res.json(result)
+})
 
 releasesRouter.get("/", async (req: Request, res: Response) => {
   const query = parseQuery(req)
@@ -94,7 +218,7 @@ releasesRouter.get("/", async (req: Request, res: Response) => {
 
 releasesRouter.get("/:id", async (req: Request, res: Response) => {
   const release = await getRelease(param(req, "id"))
-  if (!release) {
+  if (!release || (!release.visible && req.auth?.role !== "admin")) {
     res.status(404).json({ error: "Disco no encontrado" })
     return
   }
@@ -120,6 +244,9 @@ releasesRouter.post("/", writeRateLimit, requireAdmin, async (req: Request, res:
     price: parsed.price as number,
     stock: parsed.stock ?? 0,
     isNew: parsed.isNew ?? false,
+    isPreorder: parsed.isPreorder ?? false,
+    isFeatured: parsed.isFeatured ?? false,
+    visible: parsed.visible ?? true,
     tracklist: parsed.tracklist ?? [],
   }
 

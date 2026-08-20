@@ -17,6 +17,7 @@ export function parseCatalogParams(params: URLSearchParams): ReleaseFilters {
     conditions: list("estado"),
     onlyInStock: params.get("stock") === "1",
     onlyNew: params.get("novedad") === "1",
+    onlyPreorder: params.get("preventa") === "1",
     sort: params.get("orden") ?? "recientes",
     pageSize: CATALOG_PAGE_SIZE,
   }
