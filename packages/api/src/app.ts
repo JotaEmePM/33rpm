@@ -2,8 +2,6 @@ import { toNodeHandler } from "better-auth/node"
 import express, { type Express, type Request, type Response } from "express"
 import { auth } from "./auth/auth.js"
 import { env } from "./config/env.js"
-import { migrate } from "./db/schema.js"
-import { seed } from "./db/seed.js"
 import { httpLogger } from "./lib/logger.js"
 import { errorHandler, notFound } from "./middleware/errors.js"
 import { attachAuth } from "./middleware/require-auth.js"
@@ -19,9 +17,6 @@ import { ordersRouter } from "./routes/orders.js"
 import { releasesRouter } from "./routes/releases.js"
 
 export function createApp(): Express {
-  migrate()
-  seed()
-
   const app = express()
 
   // Necesario para que el límite por IP no vea siempre la del proxy.

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { db, transaction } from "../db/connection.js"
+import { all, type Executor, int, one, run, transaction } from "../db/connection.js"
 import type { Order, OrderItem, OrderStatus, ShippingMethod } from "../types.js"
 import { decrementStock, getRelease } from "./releases.js"
 
@@ -63,63 +63,66 @@ function toOrder(row: OrderRow, items: OrderItem[]): Order {
     address: row.address,
     city: row.city,
     region: row.region,
-    subtotal: row.subtotal,
-    shippingCost: row.shipping_cost,
-    total: row.total,
+    subtotal: int(row.subtotal),
+    shippingCost: int(row.shipping_cost),
+    total: int(row.total),
     status: row.status as OrderStatus,
     createdAt: row.created_at,
     items,
   }
 }
 
-function itemsFor(orderId: string): OrderItem[] {
-  const rows = db
-    .prepare("SELECT * FROM order_items WHERE order_id = ? ORDER BY id")
-    .all(orderId) as unknown as OrderItemRow[]
+async function itemsFor(orderId: string, on?: Executor): Promise<OrderItem[]> {
+  const rows = await all<OrderItemRow>(
+    "SELECT * FROM order_items WHERE order_id = ? ORDER BY id",
+    [orderId],
+    on,
+  )
 
   return rows.map((row) => ({
     releaseId: row.release_id,
     artist: row.artist,
     title: row.title,
-    unitPrice: row.unit_price,
-    quantity: row.quantity,
+    unitPrice: int(row.unit_price),
+    quantity: int(row.quantity),
   }))
 }
 
-export function createOrder(draft: OrderDraft): Order {
-  return transaction(() => {
-    const items: OrderItem[] = []
+export async function createOrder(draft: OrderDraft, on?: Executor): Promise<Order> {
+  if (!on) return transaction((tx) => createOrder(draft, tx))
 
-    for (const line of draft.items) {
-      const release = getRelease(line.releaseId)
-      if (!release) {
-        throw new OrderError(`El disco ${line.releaseId} no existe`, 404)
-      }
-      if (!decrementStock(release.id, line.quantity)) {
-        throw new OrderError(`Stock insuficiente de "${release.title}"`, 409, {
-          releaseId: release.id,
-          available: release.stock,
-          requested: line.quantity,
-        })
-      }
-      items.push({
+  const items: OrderItem[] = []
+
+  for (const line of draft.items) {
+    const release = await getRelease(line.releaseId, on)
+    if (!release) {
+      throw new OrderError(`El disco ${line.releaseId} no existe`, 404)
+    }
+    if (!(await decrementStock(release.id, line.quantity, on))) {
+      throw new OrderError(`Stock insuficiente de "${release.title}"`, 409, {
         releaseId: release.id,
-        artist: release.artist,
-        title: release.title,
-        unitPrice: release.price,
-        quantity: line.quantity,
+        available: release.stock,
+        requested: line.quantity,
       })
     }
+    items.push({
+      releaseId: release.id,
+      artist: release.artist,
+      title: release.title,
+      unitPrice: release.price,
+      quantity: line.quantity,
+    })
+  }
 
-    const subtotal = items.reduce((total, item) => total + item.unitPrice * item.quantity, 0)
-    const shippingCost = draft.shippingMethod === "retiro" ? 0 : SHIPPING_FLAT_CLP
-    const id = randomUUID()
+  const subtotal = items.reduce((total, item) => total + item.unitPrice * item.quantity, 0)
+  const shippingCost = draft.shippingMethod === "retiro" ? 0 : SHIPPING_FLAT_CLP
+  const id = randomUUID()
 
-    db.prepare(
-      `INSERT INTO orders (id, customer_name, customer_email, phone, shipping_method,
-                           address, city, region, subtotal, shipping_cost, total, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente')`,
-    ).run(
+  await run(
+    `INSERT INTO orders (id, customer_name, customer_email, phone, shipping_method,
+                         address, city, region, subtotal, shipping_cost, total, status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente')`,
+    [
       id,
       draft.customerName,
       draft.customerEmail,
@@ -131,39 +134,49 @@ export function createOrder(draft: OrderDraft): Order {
       subtotal,
       shippingCost,
       subtotal + shippingCost,
-    )
+    ],
+    on,
+  )
 
-    const insertItem = db.prepare(
+  for (const item of items) {
+    await run(
       `INSERT INTO order_items (order_id, release_id, artist, title, unit_price, quantity)
        VALUES (?, ?, ?, ?, ?, ?)`,
+      [id, item.releaseId, item.artist, item.title, item.unitPrice, item.quantity],
+      on,
     )
-    for (const item of items) {
-      insertItem.run(id, item.releaseId, item.artist, item.title, item.unitPrice, item.quantity)
-    }
+  }
 
-    const created = getOrder(id)
-    if (!created) throw new OrderError("No se pudo leer el pedido recién creado", 500)
-    return created
-  })
+  const created = await getOrder(id, on)
+  if (!created) throw new OrderError("No se pudo leer el pedido recién creado", 500)
+  return created
 }
 
-export function getOrder(id: string): Order | null {
-  const row = db.prepare("SELECT * FROM orders WHERE id = ?").get(id) as unknown as
-    | OrderRow
-    | undefined
+export async function getOrder(id: string, on?: Executor): Promise<Order | null> {
+  const row = await one<OrderRow>("SELECT * FROM orders WHERE id = ?", [id], on)
   if (!row) return null
-  return toOrder(row, itemsFor(id))
+  return toOrder(row, await itemsFor(id, on))
 }
 
-export function listOrders(limit = 50): Order[] {
-  const rows = db
-    .prepare("SELECT * FROM orders ORDER BY created_at DESC, id LIMIT ?")
-    .all(limit) as unknown as OrderRow[]
-  return rows.map((row) => toOrder(row, itemsFor(row.id)))
+export async function listOrders(limit = 50, on?: Executor): Promise<Order[]> {
+  const rows = await all<OrderRow>(
+    "SELECT * FROM orders ORDER BY created_at DESC, id LIMIT ?",
+    [limit],
+    on,
+  )
+  const orders: Order[] = []
+  for (const row of rows) {
+    orders.push(toOrder(row, await itemsFor(row.id, on)))
+  }
+  return orders
 }
 
-export function updateOrderStatus(id: string, status: OrderStatus): Order | null {
-  const result = db.prepare("UPDATE orders SET status = ? WHERE id = ?").run(status, id)
-  if (result.changes === 0) return null
-  return getOrder(id)
+export async function updateOrderStatus(
+  id: string,
+  status: OrderStatus,
+  on?: Executor,
+): Promise<Order | null> {
+  const changes = await run("UPDATE orders SET status = ? WHERE id = ?", [status, id], on)
+  if (changes === 0) return null
+  return getOrder(id, on)
 }

@@ -6,7 +6,7 @@ import { env } from "../config/env.js"
  * `jose` las cachea y solo las vuelve a pedir cuando aparece un `kid` desconocido,
  * así que esto sigue valiendo si mañana el API y el emisor se separan.
  */
-const jwks = createRemoteJWKSet(new URL("/api/auth/jwks", env.authBaseUrl), {
+const jwks = createRemoteJWKSet(new URL(env.jwksUrl ?? "/api/auth/jwks", env.authBaseUrl), {
   cacheMaxAge: 10 * 60 * 1000,
   cooldownDuration: 30 * 1000,
 })

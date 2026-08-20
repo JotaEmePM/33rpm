@@ -35,6 +35,13 @@ export const env = {
   /** URL pública de este API: better-auth firma los enlaces con ella. */
   authBaseUrl: process.env.BETTER_AUTH_URL ?? `http://localhost:${process.env.PORT ?? 3000}`,
 
+  /**
+   * De dónde leer las claves públicas del JWT. Por defecto, del propio
+   * BETTER_AUTH_URL; se separa cuando el API se sirve tras un proxy y pedirse
+   * las claves a sí mismo daría la vuelta larga.
+   */
+  jwksUrl: process.env.AUTH_JWKS_URL,
+
   /** En producción el secreto es obligatorio; en dev hay uno de desarrollo. */
   authSecret: isProduction
     ? required("BETTER_AUTH_SECRET")

@@ -1,5 +1,5 @@
 import { AUTH_SCHEMA_SQL } from "./auth-schema.js"
-import { db } from "./connection.js"
+import { client } from "./connection.js"
 
 /** DDL del catálogo. Única fuente de verdad: la usan el arranque local y la migración a Turso. */
 export const CATALOG_SCHEMA_SQL = `
@@ -63,7 +63,7 @@ export const CATALOG_SCHEMA_SQL = `
     );
   `
 
-export function migrate(): void {
-  db.exec(AUTH_SCHEMA_SQL)
-  db.exec(CATALOG_SCHEMA_SQL)
+export async function migrate(): Promise<void> {
+  await client.executeMultiple(AUTH_SCHEMA_SQL)
+  await client.executeMultiple(CATALOG_SCHEMA_SQL)
 }

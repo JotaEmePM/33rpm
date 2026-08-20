@@ -80,9 +80,9 @@ function parseReleaseBody(body: Record<string, unknown>, partial: boolean) {
   return { ...draft, tracklist }
 }
 
-releasesRouter.get("/", (req: Request, res: Response) => {
+releasesRouter.get("/", async (req: Request, res: Response) => {
   const query = parseQuery(req)
-  const { items, total } = listReleases(query)
+  const { items, total } = await listReleases(query)
   res.json({
     items,
     total,
@@ -92,8 +92,8 @@ releasesRouter.get("/", (req: Request, res: Response) => {
   })
 })
 
-releasesRouter.get("/:id", (req: Request, res: Response) => {
-  const release = getRelease(param(req, "id"))
+releasesRouter.get("/:id", async (req: Request, res: Response) => {
+  const release = await getRelease(param(req, "id"))
   if (!release) {
     res.status(404).json({ error: "Disco no encontrado" })
     return
@@ -101,12 +101,12 @@ releasesRouter.get("/:id", (req: Request, res: Response) => {
   res.json(release)
 })
 
-releasesRouter.post("/", writeRateLimit, requireAdmin, (req: Request, res: Response) => {
+releasesRouter.post("/", writeRateLimit, requireAdmin, async (req: Request, res: Response) => {
   const parsed = parseReleaseBody(req.body ?? {}, false)
 
   let id = slugify(parsed.artist as string, parsed.title as string)
   if (!id) id = `disco-${Date.now()}`
-  if (releaseExists(id)) id = `${id}-${Date.now().toString(36)}`
+  if (await releaseExists(id)) id = `${id}-${Date.now().toString(36)}`
 
   const release: Release = {
     id,
@@ -123,16 +123,16 @@ releasesRouter.post("/", writeRateLimit, requireAdmin, (req: Request, res: Respo
     tracklist: parsed.tracklist ?? [],
   }
 
-  res.status(201).json(createRelease(release))
+  res.status(201).json(await createRelease(release))
 })
 
-releasesRouter.patch("/:id", writeRateLimit, requireAdmin, (req: Request, res: Response) => {
+releasesRouter.patch("/:id", writeRateLimit, requireAdmin, async (req: Request, res: Response) => {
   const parsed = parseReleaseBody(req.body ?? {}, true)
   const changes = Object.fromEntries(
     Object.entries(parsed).filter(([, value]) => value !== undefined),
   ) as Partial<Release>
 
-  const updated = updateRelease(param(req, "id"), changes)
+  const updated = await updateRelease(param(req, "id"), changes)
   if (!updated) {
     res.status(404).json({ error: "Disco no encontrado" })
     return
@@ -140,8 +140,8 @@ releasesRouter.patch("/:id", writeRateLimit, requireAdmin, (req: Request, res: R
   res.json(updated)
 })
 
-releasesRouter.delete("/:id", writeRateLimit, requireAdmin, (req: Request, res: Response) => {
-  if (!deleteRelease(param(req, "id"))) {
+releasesRouter.delete("/:id", writeRateLimit, requireAdmin, async (req: Request, res: Response) => {
+  if (!(await deleteRelease(param(req, "id")))) {
     res.status(404).json({ error: "Disco no encontrado" })
     return
   }

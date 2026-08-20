@@ -1,13 +1,11 @@
-import { db } from "../db/connection.js"
+import { type Executor, int, one, run } from "../db/connection.js"
 
 /** Alta idempotente: repetir el correo no falla ni duplica. */
-export function subscribe(email: string): void {
-  db.prepare("INSERT OR IGNORE INTO subscribers (email) VALUES (?)").run(email.toLowerCase())
+export async function subscribe(email: string, on?: Executor): Promise<void> {
+  await run("INSERT OR IGNORE INTO subscribers (email) VALUES (?)", [email.toLowerCase()], on)
 }
 
-export function countSubscribers(): number {
-  const row = db.prepare("SELECT COUNT(*) AS total FROM subscribers").get() as unknown as {
-    total: number
-  }
-  return row.total
+export async function countSubscribers(on?: Executor): Promise<number> {
+  const row = await one<{ total: number }>("SELECT COUNT(*) AS total FROM subscribers", [], on)
+  return int(row?.total)
 }

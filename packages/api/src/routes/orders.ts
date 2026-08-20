@@ -30,7 +30,7 @@ function parseItems(value: unknown): OrderDraft["items"] {
   })
 }
 
-ordersRouter.post("/", writeRateLimit, (req: Request, res: Response) => {
+ordersRouter.post("/", writeRateLimit, async (req: Request, res: Response) => {
   const body = (req.body ?? {}) as Record<string, unknown>
   const validator = new Validator(body)
 
@@ -45,7 +45,7 @@ ordersRouter.post("/", writeRateLimit, (req: Request, res: Response) => {
   const region = validator.string("region", { required: needsAddress, max: 80 })
   validator.done()
 
-  const order = createOrder({
+  const order = await createOrder({
     customerName: customerName as string,
     customerEmail: customerEmail as string,
     phone: phone as string,
@@ -59,12 +59,12 @@ ordersRouter.post("/", writeRateLimit, (req: Request, res: Response) => {
   res.status(201).json(order)
 })
 
-ordersRouter.get("/", requireAdmin, (_req: Request, res: Response) => {
-  res.json({ items: listOrders() })
+ordersRouter.get("/", requireAdmin, async (_req: Request, res: Response) => {
+  res.json({ items: await listOrders() })
 })
 
-ordersRouter.get("/:id", (req: Request, res: Response) => {
-  const order = getOrder(param(req, "id"))
+ordersRouter.get("/:id", async (req: Request, res: Response) => {
+  const order = await getOrder(param(req, "id"))
   if (!order) {
     res.status(404).json({ error: "Pedido no encontrado" })
     return
@@ -72,12 +72,15 @@ ordersRouter.get("/:id", (req: Request, res: Response) => {
   res.json(order)
 })
 
-ordersRouter.patch("/:id/estado", requireAdmin, (req: Request, res: Response) => {
+ordersRouter.patch("/:id/estado", requireAdmin, async (req: Request, res: Response) => {
   const validator = new Validator((req.body ?? {}) as Record<string, unknown>)
   const status = validator.oneOf("status", ORDER_STATUSES)
   validator.done()
 
-  const updated = updateOrderStatus(param(req, "id"), status as (typeof ORDER_STATUSES)[number])
+  const updated = await updateOrderStatus(
+    param(req, "id"),
+    status as (typeof ORDER_STATUSES)[number],
+  )
   if (!updated) {
     res.status(404).json({ error: "Pedido no encontrado" })
     return

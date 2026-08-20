@@ -6,10 +6,11 @@ import { listGenres, listLabels } from "../repositories/releases.js"
 export const metaRouter: Router = Router()
 
 /** Todo lo que el frontend necesita para dibujar filtros y formularios. */
-metaRouter.get("/", (_req: Request, res: Response) => {
+metaRouter.get("/", async (_req: Request, res: Response) => {
+  const [genres, labels] = await Promise.all([listGenres(), listLabels()])
   res.json({
-    genres: listGenres(),
-    labels: listLabels(),
+    genres,
+    labels,
     formats: FORMATS,
     conditions: CONDITIONS,
     shippingFlatClp: SHIPPING_FLAT_CLP,

@@ -1,21 +1,21 @@
 import { LibsqlDialect } from "@libsql/kysely-libsql"
 import { env } from "../config/env.js"
-import { db as localDb } from "../db/connection.js"
+import { databaseAuthToken, databaseUrl } from "../db/connection.js"
 import { logger } from "../lib/logger.js"
 
 /**
- * Con TURSO_DATABASE_URL la auth vive en Turso; sin ella, en el mismo SQLite
- * local del catálogo. Así el login funciona en desarrollo sin credenciales.
+ * La auth comparte base y conexión con el catálogo: Turso cuando hay
+ * TURSO_DATABASE_URL, y el archivo SQLite local cuando no la hay.
  */
 export function configureAuthDatabase() {
-  if (!env.tursoUrl) {
-    logger.info("auth: usando SQLite local (define TURSO_DATABASE_URL para usar Turso)")
-    return localDb
-  }
+  logger.info(
+    env.tursoUrl ? "auth: usando Turso" : "auth: usando SQLite local (sin TURSO_DATABASE_URL)",
+  )
 
-  logger.info("auth: usando Turso")
+  // Conexión propia y no el cliente compartido: better-auth trae su propia
+  // versión de @libsql/client dentro del adaptador de Kysely.
   return {
-    dialect: new LibsqlDialect({ url: env.tursoUrl, authToken: env.tursoAuthToken }),
+    dialect: new LibsqlDialect({ url: databaseUrl, authToken: databaseAuthToken }),
     type: "sqlite" as const,
   }
 }

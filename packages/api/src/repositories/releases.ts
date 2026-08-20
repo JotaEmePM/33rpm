@@ -1,4 +1,4 @@
-import { db, transaction } from "../db/connection.js"
+import { all, type Executor, int, one, run, transaction } from "../db/connection.js"
 import type { Release, ReleaseQuery, Track } from "../types.js"
 
 interface ReleaseRow {
@@ -34,31 +34,31 @@ function toRelease(row: ReleaseRow, tracklist: Track[]): Release {
     id: row.id,
     artist: row.artist,
     title: row.title,
-    year: row.year,
+    year: int(row.year),
     genre: row.genre,
     label: row.label,
     format: row.format as Release["format"],
     condition: row.condition as Release["condition"],
-    price: row.price,
-    stock: row.stock,
-    isNew: row.is_new === 1,
+    price: int(row.price),
+    stock: int(row.stock),
+    isNew: int(row.is_new) === 1,
     tracklist,
   }
 }
 
-function tracksFor(releaseIds: string[]): Map<string, Track[]> {
+async function tracksFor(releaseIds: string[], on?: Executor): Promise<Map<string, Track[]>> {
   const grouped = new Map<string, Track[]>()
   if (releaseIds.length === 0) return grouped
 
   const placeholders = releaseIds.map(() => "?").join(", ")
-  const rows = db
-    .prepare(
-      `SELECT release_id, position, title, duration
-       FROM tracks
-       WHERE release_id IN (${placeholders})
-       ORDER BY release_id, sort_order`,
-    )
-    .all(...releaseIds) as unknown as TrackRow[]
+  const rows = await all<TrackRow>(
+    `SELECT release_id, position, title, duration
+     FROM tracks
+     WHERE release_id IN (${placeholders})
+     ORDER BY release_id, sort_order`,
+    releaseIds,
+    on,
+  )
 
   for (const row of rows) {
     const list = grouped.get(row.release_id) ?? []
@@ -68,7 +68,10 @@ function tracksFor(releaseIds: string[]): Map<string, Track[]> {
   return grouped
 }
 
-export function listReleases(query: ReleaseQuery): { items: Release[]; total: number } {
+export async function listReleases(
+  query: ReleaseQuery,
+  on?: Executor,
+): Promise<{ items: Release[]; total: number }> {
   const where: string[] = []
   const params: (string | number)[] = []
 
@@ -95,42 +98,53 @@ export function listReleases(query: ReleaseQuery): { items: Release[]; total: nu
   const whereSql = where.length > 0 ? `WHERE ${where.join(" AND ")}` : ""
   const orderSql = SORT_SQL[query.sort ?? "recientes"]
 
-  const { total } = db
-    .prepare(`SELECT COUNT(*) AS total FROM releases r ${whereSql}`)
-    .get(...params) as unknown as { total: number }
-
-  const rows = db
-    .prepare(`SELECT * FROM releases r ${whereSql} ORDER BY ${orderSql} LIMIT ? OFFSET ?`)
-    .all(...params, query.pageSize, (query.page - 1) * query.pageSize) as unknown as ReleaseRow[]
-
-  const tracks = tracksFor(rows.map((row) => row.id))
-  return { items: rows.map((row) => toRelease(row, tracks.get(row.id) ?? [])), total }
-}
-
-export function getRelease(id: string): Release | null {
-  const row = db.prepare("SELECT * FROM releases WHERE id = ?").get(id) as unknown as
-    | ReleaseRow
-    | undefined
-  if (!row) return null
-  return toRelease(row, tracksFor([id]).get(id) ?? [])
-}
-
-function replaceTracks(releaseId: string, tracklist: Track[]): void {
-  db.prepare("DELETE FROM tracks WHERE release_id = ?").run(releaseId)
-  const insert = db.prepare(
-    "INSERT INTO tracks (release_id, position, title, duration, sort_order) VALUES (?, ?, ?, ?, ?)",
+  const totals = await one<{ total: number }>(
+    `SELECT COUNT(*) AS total FROM releases r ${whereSql}`,
+    params,
+    on,
   )
-  tracklist.forEach((track, index) => {
-    insert.run(releaseId, track.position, track.title, track.duration, index)
-  })
+
+  const rows = await all<ReleaseRow>(
+    `SELECT * FROM releases r ${whereSql} ORDER BY ${orderSql} LIMIT ? OFFSET ?`,
+    [...params, query.pageSize, (query.page - 1) * query.pageSize],
+    on,
+  )
+
+  const tracks = await tracksFor(
+    rows.map((row) => row.id),
+    on,
+  )
+  return {
+    items: rows.map((row) => toRelease(row, tracks.get(row.id) ?? [])),
+    total: int(totals?.total),
+  }
 }
 
-export function createRelease(release: Release): Release {
-  return transaction(() => {
-    db.prepare(
-      `INSERT INTO releases (id, artist, title, year, genre, label, format, condition, price, stock, is_new)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(
+export async function getRelease(id: string, on?: Executor): Promise<Release | null> {
+  const row = await one<ReleaseRow>("SELECT * FROM releases WHERE id = ?", [id], on)
+  if (!row) return null
+  const tracks = await tracksFor([id], on)
+  return toRelease(row, tracks.get(id) ?? [])
+}
+
+async function replaceTracks(releaseId: string, tracklist: Track[], on: Executor): Promise<void> {
+  await run("DELETE FROM tracks WHERE release_id = ?", [releaseId], on)
+  for (const [index, track] of tracklist.entries()) {
+    await run(
+      "INSERT INTO tracks (release_id, position, title, duration, sort_order) VALUES (?, ?, ?, ?, ?)",
+      [releaseId, track.position, track.title, track.duration, index],
+      on,
+    )
+  }
+}
+
+export async function createRelease(release: Release, on?: Executor): Promise<Release> {
+  if (!on) return transaction((tx) => createRelease(release, tx))
+
+  await run(
+    `INSERT INTO releases (id, artist, title, year, genre, label, format, condition, price, stock, is_new)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
       release.id,
       release.artist,
       release.title,
@@ -142,25 +156,31 @@ export function createRelease(release: Release): Release {
       release.price,
       release.stock,
       release.isNew ? 1 : 0,
-    )
-    replaceTracks(release.id, release.tracklist)
-    return release
-  })
+    ],
+    on,
+  )
+  await replaceTracks(release.id, release.tracklist, on)
+  return release
 }
 
-export function updateRelease(id: string, changes: Partial<Release>): Release | null {
-  const current = getRelease(id)
+export async function updateRelease(
+  id: string,
+  changes: Partial<Release>,
+  on?: Executor,
+): Promise<Release | null> {
+  if (!on) return transaction((tx) => updateRelease(id, changes, tx))
+
+  const current = await getRelease(id, on)
   if (!current) return null
 
   const next: Release = { ...current, ...changes, id }
 
-  return transaction(() => {
-    db.prepare(
-      `UPDATE releases
-       SET artist = ?, title = ?, year = ?, genre = ?, label = ?, format = ?, condition = ?,
-           price = ?, stock = ?, is_new = ?
-       WHERE id = ?`,
-    ).run(
+  await run(
+    `UPDATE releases
+     SET artist = ?, title = ?, year = ?, genre = ?, label = ?, format = ?, condition = ?,
+         price = ?, stock = ?, is_new = ?
+     WHERE id = ?`,
+    [
       next.artist,
       next.title,
       next.year,
@@ -172,46 +192,54 @@ export function updateRelease(id: string, changes: Partial<Release>): Release | 
       next.stock,
       next.isNew ? 1 : 0,
       id,
-    )
-    if (changes.tracklist) replaceTracks(id, changes.tracklist)
-    return next
-  })
+    ],
+    on,
+  )
+  if (changes.tracklist) await replaceTracks(id, changes.tracklist, on)
+  return next
 }
 
-export function deleteRelease(id: string): boolean {
-  const result = db.prepare("DELETE FROM releases WHERE id = ?").run(id)
-  return result.changes > 0
+export async function deleteRelease(id: string, on?: Executor): Promise<boolean> {
+  return (await run("DELETE FROM releases WHERE id = ?", [id], on)) > 0
 }
 
-export function releaseExists(id: string): boolean {
-  return db.prepare("SELECT 1 FROM releases WHERE id = ?").get(id) !== undefined
+export async function releaseExists(id: string, on?: Executor): Promise<boolean> {
+  return (await one("SELECT 1 FROM releases WHERE id = ?", [id], on)) !== null
 }
 
 /** Descuenta stock sólo si alcanza; devuelve false cuando no queda suficiente. */
-export function decrementStock(id: string, quantity: number): boolean {
-  const result = db
-    .prepare("UPDATE releases SET stock = stock - ? WHERE id = ? AND stock >= ?")
-    .run(quantity, id, quantity)
-  return result.changes > 0
+export async function decrementStock(
+  id: string,
+  quantity: number,
+  on?: Executor,
+): Promise<boolean> {
+  const changes = await run(
+    "UPDATE releases SET stock = stock - ? WHERE id = ? AND stock >= ?",
+    [quantity, id, quantity],
+    on,
+  )
+  return changes > 0
 }
 
-export function listGenres(): string[] {
-  const rows = db
-    .prepare("SELECT DISTINCT genre FROM releases ORDER BY genre COLLATE NOCASE")
-    .all() as unknown as { genre: string }[]
+export async function listGenres(on?: Executor): Promise<string[]> {
+  const rows = await all<{ genre: string }>(
+    "SELECT DISTINCT genre FROM releases ORDER BY genre COLLATE NOCASE",
+    [],
+    on,
+  )
   return rows.map((row) => row.genre)
 }
 
-export function listLabels(): string[] {
-  const rows = db
-    .prepare("SELECT DISTINCT label FROM releases ORDER BY label COLLATE NOCASE")
-    .all() as unknown as { label: string }[]
+export async function listLabels(on?: Executor): Promise<string[]> {
+  const rows = await all<{ label: string }>(
+    "SELECT DISTINCT label FROM releases ORDER BY label COLLATE NOCASE",
+    [],
+    on,
+  )
   return rows.map((row) => row.label)
 }
 
-export function countReleases(): number {
-  const row = db.prepare("SELECT COUNT(*) AS total FROM releases").get() as unknown as {
-    total: number
-  }
-  return row.total
+export async function countReleases(on?: Executor): Promise<number> {
+  const row = await one<{ total: number }>("SELECT COUNT(*) AS total FROM releases", [], on)
+  return int(row?.total)
 }
