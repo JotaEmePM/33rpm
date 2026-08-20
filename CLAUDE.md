@@ -19,6 +19,7 @@ Por paquete, sin cambiar de directorio:
 
 ```bash
 pnpm --dir packages/api dev          # tsx watch, escucha en :3000
+pnpm --dir packages/api db:push      # crea el esquema y siembra la base configurada
 pnpm --dir packages/api typecheck    # tsc --noEmit
 pnpm --dir packages/frontend dev     # Vite en :5173 (salta de puerto si está ocupado)
 pnpm --dir packages/frontend build   # tsc -b && vite build
@@ -35,9 +36,10 @@ pnpm --dir packages/frontend lint:oxlint
 
 `routes/` (HTTP y validación) → `repositories/` (SQL) → `db/`. Los imports internos llevan extensión `.js` (NodeNext).
 
-- **Persistencia con `node:sqlite`** (`DatabaseSync`), no better-sqlite3. Requiere Node 24 y avisa de API experimental al arrancar.
-- `db/connection.ts` expone un `transaction()` **reentrante** (contador de profundidad): `createOrder` llama a funciones que ya transaccionan, y SQLite no anida `BEGIN`.
-- `migrate()` y `seed()` corren al construir la app en `app.ts`, no como paso aparte. El catálogo se siembra desde `db/seed-data.ts` con 12 discos inventados.
+- **Persistencia con `@libsql/client`**: una sola base para catálogo, pedidos y auth. Sin `TURSO_DATABASE_URL` es un archivo local (`data/33rpm.db`); con ella, Turso. Todo el acceso a datos es **asíncrono**.
+- `db/connection.ts` expone `all/one/run` y una `transaction()` que **pasa el ejecutor** al trabajo: quien participa en la transacción lo recibe como último parámetro (`getRelease(id, tx)`). Un repositorio llamado sin ejecutor abre la suya si la necesita, como `createOrder`.
+- `migrate()` y `seed()` **no corren al arrancar**: `pnpm db:push` los aplica sobre la base que digan las variables de entorno, y en desarrollo `index.ts` los ejecuta una vez. El catálogo se siembra desde `db/seed-data.ts` con 12 discos inventados.
+- `index.ts` crea la app con `express()` y `create-app.ts` la configura: ese reparto es lo que hace que Vercel reconozca el entrypoint (ver *Despliegue*).
 - `db/auth-schema.ts` es **SQL generado**, no escrito a mano: `pnpm dlx @better-auth/cli generate --config src/auth/auth.ts`. Al cambiar plugins o campos de usuario hay que regenerarlo.
 - Validación propia en `lib/validation.ts` (clase `Validator`, responde 422 con la lista de campos que fallaron). No hay zod.
 - `createOrder` descuenta stock dentro de la transacción y devuelve 409 si no alcanza.
@@ -57,7 +59,7 @@ pnpm --dir packages/frontend lint:oxlint
 - **`erasableSyntaxOnly`** en el frontend prohíbe las *parameter properties* (`constructor(private x)`). Por eso `ApiError` declara sus campos aparte.
 - `verbatimModuleSyntax`: los tipos se importan con `import type`.
 - **`RouterProvider` se importa de `react-router/dom`**, nunca de `react-router`: solo ese dispara las view transitions.
-- En `app.ts`, `toNodeHandler(auth)` va montado **antes** de `express.json()` — better-auth parsea su propio cuerpo.
+- En `create-app.ts`, `toNodeHandler(auth)` va montado **antes** de `express.json()` — better-auth parsea su propio cuerpo.
 - `packages/api/tsconfig.json` tiene `declaration: false` a propósito: con `true`, los tipos inferidos de better-auth no compilan.
 
 ## Seguridad y autenticación
@@ -66,7 +68,23 @@ pnpm --dir packages/frontend lint:oxlint
 - `middleware/require-auth.ts` identifica por JWT `Bearer` (verificado contra JWKS con `jose` en `auth/verify-token.ts`) o por cookie de sesión. El `verifyJWT` de better-auth **no funciona** fuera de su contexto interno; no volver a intentarlo.
 - `requireAdmin` protege escrituras de catálogo y la gestión de pedidos. El `RequireAdmin` del frontend es solo comodidad visual: la autorización real es del API.
 - `middleware/security.ts` concentra helmet, CORS por lista blanca y tres niveles de rate limit (global, auth, escrituras). Un origen no autorizado produce `CorsError` → 403.
-- Turso es opcional: sin `TURSO_DATABASE_URL` la auth usa el SQLite local. Las variables están en `packages/api/.env.example`; para migrar el esquema a Turso, `pnpm dlx @better-auth/cli migrate`.
+- Turso es opcional en desarrollo: sin `TURSO_DATABASE_URL` todo vive en el SQLite local. Las variables están en `packages/api/.env.example`; el esquema se aplica con `pnpm db:push`.
+- `AUTH_JWKS_URL` existe porque en Vercel el API se sirve tras el proxy del frontend: pedirse las claves a sí mismo por `BETTER_AUTH_URL` daría la vuelta larga.
+
+## Despliegue (Vercel)
+
+Dos proyectos sobre el mismo repo, ambos con despliegue automático al empujar a `master`:
+
+| Proyecto | Root directory | URL |
+| --- | --- | --- |
+| `33rpm-web` | `packages/frontend` | https://33rpm-web.vercel.app |
+| `33rpm-api` | `packages/api` | https://33rpm-api-jotaemepms-projects.vercel.app |
+
+- El frontend **hace de proxy**: `packages/frontend/vercel.json` reescribe `/api/*` hacia el API. Así la sesión es cookie de primera parte; con dominios separados serían cookies de terceros y Safari las bloquea. Por eso `BETTER_AUTH_URL`, `APP_URL` y `CORS_ORIGINS` apuntan al **dominio del frontend**.
+- Vercel detecta el API como servidor Express y arranca el entrypoint que encuentre en `outputDirectory` (`dist`). Busca `app`/`index`/`server` por ese orden y **exige que el entrypoint importe `express`**: de ahí que `index.ts` haga el `express()` y que no exista `dist/app.js`.
+- La base de producción es la rama `prd` de Turso. El esquema se aplica desde fuera (`pnpm db:push` con las variables de `prd`), nunca en el arranque en frío.
+- Las variables de producción viven en Vercel (`vercel env ls --cwd packages/api`). `NODE_ENV` la pone Vercel.
+- **El envío del enlace mágico no está configurado en producción**: `auth/magic-link-mailer.ts` lanza error a propósito mientras no haya proveedor de correo, así que el login responde 500. El catálogo, el carrito y los pedidos funcionan sin sesión.
 
 ## Convenciones de producto
 
