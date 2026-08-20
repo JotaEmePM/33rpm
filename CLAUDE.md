@@ -64,7 +64,7 @@ pnpm --dir packages/frontend lint:oxlint
 
 ## Seguridad y autenticación
 
-- Entrada **solo por magic link**. En desarrollo el enlace se imprime en el log (`auth/magic-link-mailer.ts`); en producción **falla explícitamente** hasta enchufar un proveedor de correo.
+- Entrada **solo por magic link**, enviado con **Resend** (`auth/magic-link-mailer.ts`, plantilla en `auth/magic-link-email.ts`). Sin `RESEND_API_KEY` el enlace se imprime en el log, que es como funciona el desarrollo; en producción, sin clave, falla en vez de fingir el envío.
 - `middleware/require-auth.ts` identifica por JWT `Bearer` (verificado contra JWKS con `jose` en `auth/verify-token.ts`) o por cookie de sesión. El `verifyJWT` de better-auth **no funciona** fuera de su contexto interno; no volver a intentarlo.
 - `requireAdmin` protege escrituras de catálogo y la gestión de pedidos. El `RequireAdmin` del frontend es solo comodidad visual: la autorización real es del API.
 - `middleware/security.ts` concentra helmet, CORS por lista blanca y tres niveles de rate limit (global, auth, escrituras). Un origen no autorizado produce `CorsError` → 403.
@@ -84,7 +84,8 @@ Dos proyectos sobre el mismo repo, ambos con despliegue automático al empujar a
 - Vercel detecta el API como servidor Express y arranca el entrypoint que encuentre en `outputDirectory` (`dist`). Busca `app`/`index`/`server` por ese orden y **exige que el entrypoint importe `express`**: de ahí que `index.ts` haga el `express()` y que no exista `dist/app.js`.
 - La base de producción es la rama `prd` de Turso. El esquema se aplica desde fuera (`pnpm db:push` con las variables de `prd`), nunca en el arranque en frío.
 - Las variables de producción viven en Vercel (`vercel env ls --cwd packages/api`). `NODE_ENV` la pone Vercel.
-- **El envío del enlace mágico no está configurado en producción**: `auth/magic-link-mailer.ts` lanza error a propósito mientras no haya proveedor de correo, así que el login responde 500. El catálogo, el carrito y los pedidos funcionan sin sesión.
+- El correo sale desde `MAIL_FROM`, hoy `33rpm <onboarding@resend.dev>`. Ese remitente de pruebas de Resend **solo entrega a la dirección dueña de la cuenta** (`jotaemepm@outlook.com`): a cualquier otro destinatario Resend responde 403 y el acceso da 500. Para abrirlo a clientes hay que verificar un dominio en resend.com/domains y cambiar `MAIL_FROM`; no hay que tocar código.
+- El límite de intentos de auth cuenta la IP real del cliente tras el proxy: `X-Forwarded-For` falsificada no reinicia el contador (comprobado en producción).
 
 ## Convenciones de producto
 
