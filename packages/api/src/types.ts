@@ -12,6 +12,15 @@ export interface Track {
   duration: string
 }
 
+export interface ReleaseImage {
+  id: string
+  url: string
+  /** Ruta dentro del store de Blob: es lo que hace falta para borrarla. */
+  pathname: string
+  /** La que representa al disco en el catálogo y en la búsqueda. */
+  isPrimary: boolean
+}
+
 export interface Release {
   id: string
   artist: string
@@ -30,6 +39,11 @@ export interface Release {
   isFeatured: boolean
   /** Un disco no visible sigue en el catálogo pero no se muestra ni se vende. */
   visible: boolean
+  /**
+   * En la ficha llegan todas, con la principal primero; en los listados sólo
+   * viaja la principal, que es lo único que se dibuja.
+   */
+  images: ReleaseImage[]
   tracklist: Track[]
 }
 
@@ -42,6 +56,8 @@ export interface ReleaseQuery {
   onlyNew?: boolean
   onlyPreorder?: boolean
   onlyFeatured?: boolean
+  /** Para el panel: los discos a los que todavía les falta la foto. */
+  onlyWithoutImages?: boolean
   /** Sólo la administración pide ver los discos ocultos. */
   includeHidden?: boolean
   sort?: "recientes" | "precio-asc" | "precio-desc" | "artista"

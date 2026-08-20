@@ -44,6 +44,7 @@ export function ReleaseCard({ release, animated = false }: ReleaseCardProps) {
             ref={sleeveRef}
             artist={release.artist}
             title={release.title}
+            src={release.images[0]?.url}
             viewTransitionName={isOpening ? `sleeve-${release.id}` : undefined}
           />
           {/* Las marcas se apilan para que ninguna tape a otra sobre la carátula. */}

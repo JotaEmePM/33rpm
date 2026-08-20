@@ -3,7 +3,9 @@ import { RequireAdmin } from "../components/auth/RequireAdmin"
 import { Layout } from "../components/layout/Layout"
 import { RouteError } from "../components/RouteError"
 import { AdminProductsPage } from "../pages/admin/AdminProductsPage"
+import { EditProductPage } from "../pages/admin/EditProductPage"
 import { NewProductPage } from "../pages/admin/NewProductPage"
+import { PhotosPage } from "../pages/admin/PhotosPage"
 import { CartPage } from "../pages/CartPage"
 import { CatalogPage } from "../pages/CatalogPage"
 import { CheckoutPage } from "../pages/CheckoutPage"
@@ -48,6 +50,22 @@ export const routes: RouteObject[] = [
         element: (
           <RequireAdmin>
             <NewProductPage />
+          </RequireAdmin>
+        ),
+      },
+      {
+        path: "admin/productos/:id",
+        element: (
+          <RequireAdmin>
+            <EditProductPage />
+          </RequireAdmin>
+        ),
+      },
+      {
+        path: "admin/fotos",
+        element: (
+          <RequireAdmin>
+            <PhotosPage />
           </RequireAdmin>
         ),
       },

@@ -1,7 +1,7 @@
 import type { Release } from "../types.js"
 
 /** El seed describe la ficha; visibilidad y marcas de venta las pone `seed()`. */
-export type SeedRelease = Omit<Release, "visible" | "isPreorder" | "isFeatured">
+export type SeedRelease = Omit<Release, "visible" | "isPreorder" | "isFeatured" | "images">
 
 /**
  * Catálogo inicial con el que se siembra la base la primera vez.

@@ -4,6 +4,7 @@ import { NavLink } from "react-router"
 const TABS = [
   { to: "/admin/productos", label: "Productos" },
   { to: "/admin/productos/nuevo", label: "Nuevo disco" },
+  { to: "/admin/fotos", label: "Fotos" },
 ]
 
 export function AdminHeader({ title, action }: { title: string; action?: ReactNode }) {

@@ -8,6 +8,14 @@ export interface Track {
   duration: string
 }
 
+export interface ReleaseImage {
+  id: string
+  url: string
+  pathname: string
+  /** La que representa al disco en catálogo y buscador. */
+  isPrimary: boolean
+}
+
 export interface Release {
   id: string
   artist: string
@@ -28,6 +36,8 @@ export interface Release {
   isFeatured: boolean
   /** Un disco no visible sigue en el catálogo pero no se muestra en la tienda. */
   visible: boolean
+  /** En los listados llega sólo la principal; en la ficha, todas. */
+  images: ReleaseImage[]
   tracklist: Track[]
 }
 

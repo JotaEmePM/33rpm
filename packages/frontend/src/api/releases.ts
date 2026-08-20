@@ -1,4 +1,4 @@
-import type { Release } from "../types"
+import type { Release, ReleaseImage } from "../types"
 import { request } from "./client"
 
 export interface ReleaseFilters {
@@ -15,6 +15,8 @@ export interface ReleaseFilters {
   pageSize?: number
   /** Sólo la administración ve los discos ocultos. */
   includeHidden?: boolean
+  /** Sólo la administración: discos a los que les falta la foto. */
+  onlyWithoutImages?: boolean
 }
 
 export interface ReleasePage {
@@ -39,6 +41,7 @@ export function toQueryString(filters: ReleaseFilters): string {
   if (filters.page) params.set("pagina", String(filters.page))
   if (filters.pageSize) params.set("limite", String(filters.pageSize))
   if (filters.includeHidden) params.set("ocultos", "1")
+  if (filters.onlyWithoutImages) params.set("sinFoto", "1")
   const query = params.toString()
   return query ? `?${query}` : ""
 }
@@ -52,7 +55,40 @@ export function fetchRelease(id: string, signal?: AbortSignal): Promise<Release>
 }
 
 /** Un disco nuevo nace visible: el alta no pregunta por algo que casi siempre es sí. */
-export type ReleaseDraft = Omit<Release, "id" | "visible" | "isPreorder" | "isFeatured"> & {
+export interface ImageList {
+  items: ReleaseImage[]
+}
+
+/**
+ * La imagen viaja como binario crudo: es lo que evita montar multipart en el
+ * API y deja el límite de tamaño en manos del propio cuerpo de la petición.
+ */
+export function uploadImage(releaseId: string, file: Blob, name: string): Promise<ReleaseImage> {
+  return request<ReleaseImage>(
+    `/api/releases/${encodeURIComponent(releaseId)}/imagenes?nombre=${encodeURIComponent(name)}`,
+    { method: "POST", body: file, contentType: file.type, auth: true },
+  )
+}
+
+export function setPrimaryImage(releaseId: string, imageId: string): Promise<ImageList> {
+  return request<ImageList>(
+    `/api/releases/${encodeURIComponent(releaseId)}/imagenes/${encodeURIComponent(imageId)}/principal`,
+    { method: "PUT", auth: true },
+  )
+}
+
+export function deleteImage(releaseId: string, imageId: string): Promise<ImageList> {
+  return request<ImageList>(
+    `/api/releases/${encodeURIComponent(releaseId)}/imagenes/${encodeURIComponent(imageId)}`,
+    { method: "DELETE", auth: true },
+  )
+}
+
+/** El alta no lleva fotos: se suben después, cuando el disco ya existe. */
+export type ReleaseDraft = Omit<
+  Release,
+  "id" | "visible" | "isPreorder" | "isFeatured" | "images"
+> & {
   id?: string
   visible?: boolean
   isPreorder?: boolean

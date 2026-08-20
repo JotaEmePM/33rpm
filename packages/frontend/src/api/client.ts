@@ -21,12 +21,15 @@ interface RequestOptions {
   signal?: AbortSignal
   /** Las rutas protegidas viajan con el JWT de la sesión. */
   auth?: boolean
+  /** Fuerza el tipo del cuerpo: las imágenes se mandan en crudo, no como JSON. */
+  contentType?: string
 }
 
 async function send(path: string, options: RequestOptions, token: string | null) {
-  const { method = "GET", body, signal } = options
+  const { method = "GET", body, signal, contentType } = options
+  const raw = body instanceof Blob
   const headers: Record<string, string> = {}
-  if (body) headers["Content-Type"] = "application/json"
+  if (body) headers["Content-Type"] = contentType ?? "application/json"
   if (token) headers.Authorization = `Bearer ${token}`
 
   return fetch(`${BASE_URL}${path}`, {
@@ -34,7 +37,7 @@ async function send(path: string, options: RequestOptions, token: string | null)
     signal,
     credentials: "include",
     headers: Object.keys(headers).length > 0 ? headers : undefined,
-    body: body ? JSON.stringify(body) : undefined,
+    body: body ? (raw ? body : JSON.stringify(body)) : undefined,
   })
 }
 

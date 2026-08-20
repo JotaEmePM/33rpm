@@ -23,6 +23,12 @@ export function errorHandler(
     return
   }
 
+  // body-parser corta la subida cuando la imagen pasa del límite.
+  if ((error as { type?: string })?.type === "entity.too.large") {
+    res.status(413).json({ error: "La imagen supera el tamaño permitido" })
+    return
+  }
+
   if (error instanceof OrderError) {
     res.status(error.status).json({ error: error.message, details: error.details })
     return

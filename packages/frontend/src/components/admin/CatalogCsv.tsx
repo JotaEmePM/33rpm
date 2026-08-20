@@ -1,4 +1,5 @@
 import { type ChangeEvent, useRef, useState } from "react"
+import { Link } from "react-router"
 import { ApiError } from "../../api/client"
 import { type ImportResult, importReleases } from "../../api/releases"
 import {
@@ -202,7 +203,12 @@ export function CatalogCsv({ releases, onImported }: CatalogCsvProps) {
           {result.ocultados > 0
             ? ` y ${result.ocultados} ${result.ocultados === 1 ? "oculto" : "ocultos"}`
             : ""}
-          .
+          .{" "}
+          {result.creados > 0 ? (
+            <Link to="/admin/fotos" viewTransition className="underline hover:text-paper">
+              Subir las fotos de los discos nuevos
+            </Link>
+          ) : null}
         </p>
       ) : null}
 

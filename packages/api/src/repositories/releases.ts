@@ -1,5 +1,6 @@
 import { all, type Executor, int, one, run, transaction } from "../db/connection.js"
-import type { Release, ReleaseQuery, Track } from "../types.js"
+import type { Release, ReleaseImage, ReleaseQuery, Track } from "../types.js"
+import { imagesFor, listImages, removeImagesOf } from "./images.js"
 
 interface ReleaseRow {
   id: string
@@ -32,7 +33,7 @@ const SORT_SQL: Record<NonNullable<ReleaseQuery["sort"]>, string> = {
   artista: "r.artist COLLATE NOCASE ASC",
 }
 
-function toRelease(row: ReleaseRow, tracklist: Track[]): Release {
+function toRelease(row: ReleaseRow, tracklist: Track[], images: ReleaseImage[] = []): Release {
   return {
     id: row.id,
     artist: row.artist,
@@ -48,6 +49,7 @@ function toRelease(row: ReleaseRow, tracklist: Track[]): Release {
     isPreorder: int(row.is_preorder) === 1,
     isFeatured: int(row.is_featured) === 1,
     visible: int(row.visible) === 1,
+    images,
     tracklist,
   }
 }
@@ -102,6 +104,9 @@ export async function listReleases(
   if (query.onlyNew) where.push("r.is_new = 1")
   if (query.onlyPreorder) where.push("r.is_preorder = 1")
   if (query.onlyFeatured) where.push("r.is_featured = 1")
+  if (query.onlyWithoutImages) {
+    where.push("NOT EXISTS (SELECT 1 FROM release_images i WHERE i.release_id = r.id)")
+  }
   // Los ocultos sólo salen si quien pregunta lo pide expresamente.
   if (!query.includeHidden) where.push("r.visible = 1")
 
@@ -120,12 +125,13 @@ export async function listReleases(
     on,
   )
 
-  const tracks = await tracksFor(
-    rows.map((row) => row.id),
-    on,
-  )
+  const ids = rows.map((row) => row.id)
+  const [tracks, covers] = await Promise.all([
+    tracksFor(ids, on),
+    imagesFor(ids, { onlyPrimary: true }, on),
+  ])
   return {
-    items: rows.map((row) => toRelease(row, tracks.get(row.id) ?? [])),
+    items: rows.map((row) => toRelease(row, tracks.get(row.id) ?? [], covers.get(row.id) ?? [])),
     total: int(totals?.total),
   }
 }
@@ -133,8 +139,8 @@ export async function listReleases(
 export async function getRelease(id: string, on?: Executor): Promise<Release | null> {
   const row = await one<ReleaseRow>("SELECT * FROM releases WHERE id = ?", [id], on)
   if (!row) return null
-  const tracks = await tracksFor([id], on)
-  return toRelease(row, tracks.get(id) ?? [])
+  const [tracks, images] = await Promise.all([tracksFor([id], on), listImages(id, on)])
+  return toRelease(row, tracks.get(id) ?? [], images)
 }
 
 async function replaceTracks(releaseId: string, tracklist: Track[], on: Executor): Promise<void> {
@@ -221,11 +227,13 @@ export async function updateRelease(
  * foráneas activas, y en el SQLite local vienen apagadas: se hace a mano para
  * que el resultado sea el mismo contra Turso que contra un archivo.
  */
-export async function deleteRelease(id: string, on?: Executor): Promise<boolean> {
+export async function deleteRelease(id: string, on?: Executor): Promise<ReleaseImage[] | null> {
   if (!on) return transaction((tx) => deleteRelease(id, tx))
 
+  const images = await removeImagesOf(id, on)
   await run("DELETE FROM tracks WHERE release_id = ?", [id], on)
-  return (await run("DELETE FROM releases WHERE id = ?", [id], on)) > 0
+  const deleted = await run("DELETE FROM releases WHERE id = ?", [id], on)
+  return deleted > 0 ? images : null
 }
 
 export async function releaseExists(id: string, on?: Executor): Promise<boolean> {

@@ -2,10 +2,10 @@ import { useRef } from "react"
 import { Link, useLoaderData } from "react-router"
 import { ReleaseCard } from "../components/catalog/ReleaseCard"
 import { AddToCartPanel } from "../components/product/AddToCartPanel"
+import { ReleaseGallery } from "../components/product/ReleaseGallery"
 import { ReleaseMeta } from "../components/product/ReleaseMeta"
 import { Tracklist } from "../components/product/Tracklist"
 import { Badge } from "../components/ui/Badge"
-import { Sleeve } from "../components/ui/Sleeve"
 import { useReleases } from "../hooks/useReleases"
 import type { Release } from "../types"
 
@@ -38,12 +38,7 @@ export function ProductPage() {
 
       <div className="grid gap-8 border-b-2 border-paper px-4 py-8 sm:px-6 lg:grid-cols-2">
         <div className="flex flex-col gap-6">
-          <Sleeve
-            ref={sleeveRef}
-            artist={release.artist}
-            title={release.title}
-            viewTransitionName={`sleeve-${release.id}`}
-          />
+          <ReleaseGallery release={release} sleeveRef={sleeveRef} />
           <ReleaseMeta release={release} />
         </div>
 

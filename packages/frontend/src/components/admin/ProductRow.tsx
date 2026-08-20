@@ -39,6 +39,13 @@ export function ProductRow({ release, onDelete, onToggleVisible }: ProductRowPro
         </span>
       </td>
       <td className="p-3 text-right">
+        <Link
+          to={`/admin/productos/${release.id}`}
+          viewTransition
+          className="label min-h-11 px-2 text-muted transition-colors hover:text-volt"
+        >
+          Editar
+        </Link>
         <button
           type="button"
           onClick={() => onToggleVisible(release)}

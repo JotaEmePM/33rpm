@@ -1,9 +1,17 @@
-import { type Request, type Response, Router } from "express"
+import express, { type Request, type Response, Router } from "express"
 import { transaction } from "../db/connection.js"
+import {
+  deleteStoredImages,
+  IMAGE_TYPES,
+  isBlobConfigured,
+  MAX_IMAGE_BYTES,
+  storeImage,
+} from "../lib/blob.js"
 import { param } from "../lib/http.js"
 import { CONDITIONS, FORMATS, slugify, ValidationError, Validator } from "../lib/validation.js"
 import { requireAdmin } from "../middleware/require-auth.js"
 import { writeRateLimit } from "../middleware/security.js"
+import { addImage, listImages, removeImage, setPrimaryImage } from "../repositories/images.js"
 import {
   createRelease,
   deleteRelease,
@@ -39,6 +47,7 @@ function parseQuery(req: Request): ReleaseQuery {
     onlyNew: novedad === "1" || novedad === "true",
     onlyPreorder: preventa === "1" || preventa === "true",
     onlyFeatured: destacado === "1" || destacado === "true",
+    onlyWithoutImages: req.query.sinFoto === "1" && req.auth?.role === "admin",
     sort,
     page: Math.max(1, Number(pagina) || 1),
     pageSize: Math.min(100, Math.max(1, Number(limite) || 24)),
@@ -190,6 +199,9 @@ releasesRouter.post("/importar", writeRateLimit, requireAdmin, async (req, res) 
 
   if (issues.length > 0) throw new ValidationError(issues)
 
+  // Se recogen aquí y se borran del store al terminar, ya con la base consistente.
+  const orphans: string[] = []
+
   const result = await transaction(async (tx) => {
     const missing: string[] = []
 
@@ -203,9 +215,12 @@ releasesRouter.post("/importar", writeRateLimit, requireAdmin, async (req, res) 
 
     const gone: string[] = []
     for (const deletion of deletions) {
-      if (!(await deleteRelease(deletion.id, tx))) {
+      const images = await deleteRelease(deletion.id, tx)
+      if (!images) {
         gone.push(`${deletion.where}: el disco "${deletion.id}" no existe en el catálogo`)
+        continue
       }
+      orphans.push(...images.map((image) => image.url))
     }
     if (gone.length > 0) throw new ValidationError(gone)
 
@@ -229,8 +244,91 @@ releasesRouter.post("/importar", writeRateLimit, requireAdmin, async (req, res) 
     }
   })
 
+  await deleteStoredImages(orphans)
   res.json(result)
 })
+
+/** El cuerpo llega como binario: una imagen no es JSON ni cabe en un formulario. */
+const imageBody = express.raw({ type: [...IMAGE_TYPES], limit: MAX_IMAGE_BYTES })
+
+const EXTENSIONS: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/avif": "avif",
+}
+
+/** Sube una foto al store y la deja colgada del disco. La primera queda de portada. */
+releasesRouter.post(
+  "/:id/imagenes",
+  writeRateLimit,
+  requireAdmin,
+  imageBody,
+  async (req: Request, res: Response) => {
+    if (!isBlobConfigured()) {
+      res.status(503).json({ error: "El almacenamiento de imágenes no está configurado" })
+      return
+    }
+
+    const id = param(req, "id")
+    if (!(await releaseExists(id))) {
+      res.status(404).json({ error: "Disco no encontrado" })
+      return
+    }
+
+    const contentType = (req.headers["content-type"] ?? "").split(";")[0].trim()
+    const extension = EXTENSIONS[contentType]
+    if (!extension) {
+      throw new ValidationError([`El formato ${contentType || "desconocido"} no está permitido`])
+    }
+
+    const body = req.body
+    if (!Buffer.isBuffer(body) || body.length === 0) {
+      throw new ValidationError(["No llegó ninguna imagen"])
+    }
+
+    const name = slugify(String(req.query.nombre ?? "").replace(/\.[a-z0-9]+$/i, "")) || "foto"
+    const stored = await storeImage(`discos/${id}/${name}.${extension}`, body, contentType)
+
+    res.status(201).json(await addImage(id, stored))
+  },
+)
+
+releasesRouter.get("/:id/imagenes", requireAdmin, async (req: Request, res: Response) => {
+  res.json({ items: await listImages(param(req, "id")) })
+})
+
+/** Cambia la portada: la que se ve en el catálogo y en el buscador. */
+releasesRouter.put(
+  "/:id/imagenes/:imagenId/principal",
+  writeRateLimit,
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    const id = param(req, "id")
+    if (!(await setPrimaryImage(id, param(req, "imagenId")))) {
+      res.status(404).json({ error: "Imagen no encontrada" })
+      return
+    }
+    res.json({ items: await listImages(id) })
+  },
+)
+
+releasesRouter.delete(
+  "/:id/imagenes/:imagenId",
+  writeRateLimit,
+  requireAdmin,
+  async (req: Request, res: Response) => {
+    const id = param(req, "id")
+    const removed = await removeImage(id, param(req, "imagenId"))
+    if (!removed) {
+      res.status(404).json({ error: "Imagen no encontrada" })
+      return
+    }
+
+    await deleteStoredImages([removed.url])
+    res.json({ items: await listImages(id) })
+  },
+)
 
 releasesRouter.get("/", async (req: Request, res: Response) => {
   const query = parseQuery(req)
@@ -275,6 +373,7 @@ releasesRouter.post("/", writeRateLimit, requireAdmin, async (req: Request, res:
     isPreorder: parsed.isPreorder ?? false,
     isFeatured: parsed.isFeatured ?? false,
     visible: parsed.visible ?? true,
+    images: [],
     tracklist: parsed.tracklist ?? [],
   }
 
@@ -296,9 +395,13 @@ releasesRouter.patch("/:id", writeRateLimit, requireAdmin, async (req: Request, 
 })
 
 releasesRouter.delete("/:id", writeRateLimit, requireAdmin, async (req: Request, res: Response) => {
-  if (!(await deleteRelease(param(req, "id")))) {
+  const images = await deleteRelease(param(req, "id"))
+  if (!images) {
     res.status(404).json({ error: "Disco no encontrado" })
     return
   }
+
+  // Fuera de la transacción: la base ya está limpia y un huérfano en Blob no la corrompe.
+  await deleteStoredImages(images.map((image) => image.url))
   res.status(204).end()
 })

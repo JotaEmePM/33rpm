@@ -3,6 +3,8 @@ import type { Ref } from "react"
 interface SleeveProps {
   artist: string
   title: string
+  /** Foto del disco; sin ella se dibuja la carátula de relleno. */
+  src?: string | null
   /** Define el ancho de la carátula; el alto sale del aspecto 1:1. */
   className?: string
   /** Nombre para la view transition; debe ser único en el documento mientras dura. */
@@ -28,10 +30,28 @@ function initials(artist: string): string {
 export function Sleeve({
   artist,
   title,
+  src,
   className = "w-full",
   viewTransitionName,
   ref,
 }: SleeveProps) {
+  if (src) {
+    return (
+      <div
+        ref={ref}
+        className={`relative aspect-square overflow-hidden bg-smoke ${className}`}
+        style={viewTransitionName ? { viewTransitionName } : undefined}
+      >
+        <img
+          src={src}
+          alt={`${artist} — ${title}`}
+          loading="lazy"
+          className="size-full object-cover"
+        />
+      </div>
+    )
+  }
+
   return (
     <div
       ref={ref}

@@ -32,6 +32,18 @@ export const CATALOG_SCHEMA_SQL = `
 
     CREATE INDEX IF NOT EXISTS idx_tracks_release ON tracks(release_id);
 
+    CREATE TABLE IF NOT EXISTS release_images (
+      id TEXT PRIMARY KEY,
+      release_id TEXT NOT NULL REFERENCES releases(id) ON DELETE CASCADE,
+      url TEXT NOT NULL,
+      pathname TEXT NOT NULL,
+      is_primary INTEGER NOT NULL DEFAULT 0,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_release_images_release ON release_images(release_id);
+
     CREATE TABLE IF NOT EXISTS orders (
       id TEXT PRIMARY KEY,
       customer_name TEXT NOT NULL,

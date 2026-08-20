@@ -116,12 +116,22 @@ export function SearchField({ className = "" }: { className?: string }) {
                   index === highlighted ? "bg-smoke text-volt" : "text-paper"
                 }`}
               >
-                <span className="min-w-0">
-                  <span className="block truncate font-display text-lg uppercase leading-tight">
-                    {release.title}
-                  </span>
-                  <span className="block truncate text-xs text-muted">
-                    {release.artist} · {release.label}
+                <span className="flex min-w-0 items-center gap-3">
+                  {release.images[0] ? (
+                    <img
+                      src={release.images[0].url}
+                      alt=""
+                      loading="lazy"
+                      className="size-10 shrink-0 object-cover"
+                    />
+                  ) : null}
+                  <span className="min-w-0">
+                    <span className="block truncate font-display text-lg uppercase leading-tight">
+                      {release.title}
+                    </span>
+                    <span className="block truncate text-xs text-muted">
+                      {release.artist} · {release.label}
+                    </span>
                   </span>
                 </span>
                 <Price value={release.price} size="sm" />

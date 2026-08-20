@@ -8,6 +8,8 @@ interface FieldProps {
   /** Con `value` + `onChange` el campo pasa a ser controlado. */
   value?: string
   onChange?: (value: string) => void
+  /** Valor inicial cuando el campo va suelto, como en la edición de un disco. */
+  defaultValue?: string
 }
 
 export function Field({
@@ -19,6 +21,7 @@ export function Field({
   className = "",
   value,
   onChange,
+  defaultValue,
 }: FieldProps) {
   const controlled = value !== undefined && onChange !== undefined
 
@@ -31,6 +34,7 @@ export function Field({
         autoComplete={autoComplete}
         required={required}
         value={controlled ? value : undefined}
+        defaultValue={controlled ? undefined : defaultValue}
         onChange={controlled ? (event) => onChange(event.target.value) : undefined}
         className="min-h-12 border-2 border-steel bg-transparent px-3 text-paper focus:border-volt focus:outline-none"
       />
