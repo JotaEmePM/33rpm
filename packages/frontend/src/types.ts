@@ -1,4 +1,4 @@
-export type ReleaseFormat = "LP" | "2LP" | "EP" | '7"' | "Box"
+export type ReleaseFormat = "LP" | "2LP" | "EP" | '7"' | "CD" | "Box"
 
 export type ReleaseCondition = "Nuevo" | "Usado"
 

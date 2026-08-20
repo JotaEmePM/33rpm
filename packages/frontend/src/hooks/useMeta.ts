@@ -4,7 +4,7 @@ import { useAsync } from "./useAsync"
 const FALLBACK: CatalogMeta = {
   genres: [],
   labels: [],
-  formats: ["LP", "2LP", "EP", '7"', "Box"],
+  formats: ["LP", "2LP", "EP", '7"', "CD", "Box"],
   conditions: ["Nuevo", "Usado"],
   shippingFlatClp: 0,
   currency: "CLP",

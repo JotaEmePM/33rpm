@@ -5,7 +5,7 @@ export class ValidationError extends Error {
   }
 }
 
-export const FORMATS = ["LP", "2LP", "EP", '7"', "Box"] as const
+export const FORMATS = ["LP", "2LP", "EP", '7"', "CD", "Box"] as const
 export const CONDITIONS = ["Nuevo", "Usado"] as const
 export const SHIPPING_METHODS = ["retiro", "despacho"] as const
 export const ORDER_STATUSES = ["pendiente", "pagado", "enviado", "anulado"] as const
