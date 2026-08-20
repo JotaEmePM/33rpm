@@ -16,9 +16,11 @@ import { newsletterRouter } from "./routes/newsletter.js"
 import { ordersRouter } from "./routes/orders.js"
 import { releasesRouter } from "./routes/releases.js"
 
-export function createApp(): Express {
-  const app = express()
-
+/**
+ * Monta seguridad, auth y rutas sobre la app que reciba. Quien la crea es
+ * `index.ts`, que además es el entrypoint que Vercel arranca en producción.
+ */
+export function configureApp(app: Express): Express {
   // Necesario para que el límite por IP no vea siempre la del proxy.
   app.set("trust proxy", env.trustProxy)
   app.disable("x-powered-by")

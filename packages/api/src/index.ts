@@ -1,5 +1,6 @@
+import express from "express"
 import { env } from "./config/env.js"
-import { createApp } from "./create-app.js"
+import { configureApp } from "./create-app.js"
 import { bootstrapDatabase } from "./db/bootstrap.js"
 
 const port = Number(process.env.PORT ?? 3000)
@@ -11,6 +12,6 @@ if (!env.isProduction) {
 }
 
 // Vercel toma este servidor por su llamada a listen(); en local es el de siempre.
-createApp().listen(port, () => {
+configureApp(express()).listen(port, () => {
   console.log(`api escuchando en http://localhost:${port}`)
 })
