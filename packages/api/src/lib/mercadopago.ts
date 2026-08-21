@@ -55,6 +55,16 @@ async function callMercadoPago<T>(
 }
 
 /**
+ * Mercado Pago no acepta `localhost` como destino de vuelta: con `auto_return`
+ * activado responde 400 (`invalid_auto_return`). En desarrollo se omite y el
+ * cliente vuelve pulsando el botón del comprobante, que es lo único que cambia.
+ */
+function isPublicUrl(url: string): boolean {
+  const { hostname } = new URL(url)
+  return hostname !== "localhost" && hostname !== "127.0.0.1" && hostname !== "[::1]"
+}
+
+/**
  * Crea la preferencia de Checkout Pro. El pedido viaja como `external_reference`
  * para poder reconocerlo cuando llegue la notificación del pago.
  */
@@ -75,7 +85,7 @@ export async function createPreference(request: PreferenceRequest): Promise<Pref
           pending: `${request.backUrl}?estado=pendiente`,
           failure: `${request.backUrl}?estado=fallo`,
         },
-        auto_return: "approved",
+        ...(isPublicUrl(request.backUrl) ? { auto_return: "approved" } : {}),
       }),
     },
   )
