@@ -4,6 +4,7 @@ import { fetchOrder, type Order, startPayment } from "../api/orders"
 import { OrderConfirmation } from "../components/checkout/OrderConfirmation"
 import { Button } from "../components/ui/Button"
 import { ErrorState, LoadingState } from "../components/ui/StateMessage"
+import { useMeta } from "../hooks/useMeta"
 
 /** Lo que se le dice al cliente según cómo volvió de Mercado Pago. */
 const RETURN_MESSAGES: Record<string, string> = {
@@ -23,6 +24,7 @@ const PAYMENT_LABEL: Record<string, string> = {
 
 export function OrderPage() {
   const { id } = useParams()
+  const meta = useMeta()
   const [searchParams] = useSearchParams()
   const [order, setOrder] = useState<Order | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -96,7 +98,7 @@ export function OrderPage() {
               ) : null}
             </div>
 
-            <OrderConfirmation order={order} />
+            <OrderConfirmation order={order} paymentsEnabled={meta.paymentsEnabled} />
 
             {canRetry ? (
               <Button onClick={handleRetry} disabled={retrying}>

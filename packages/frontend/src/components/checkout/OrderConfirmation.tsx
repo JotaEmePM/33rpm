@@ -1,8 +1,21 @@
 import type { Order } from "../../api/orders"
 import { formatPrice } from "../../lib/format"
-import { LinkButton } from "../ui/LinkButton"
 
-export function OrderConfirmation({ order }: { order: Order }) {
+interface OrderConfirmationProps {
+  order: Order
+  /** Sin pasarela el pedido queda pendiente a propósito; con ella, es que el cobro falló. */
+  paymentsEnabled: boolean
+}
+
+/** Recibo del pedido. Las acciones las pone quien lo muestra: aquí sólo se informa. */
+export function OrderConfirmation({ order, paymentsEnabled }: OrderConfirmationProps) {
+  const nota =
+    order.paymentStatus === "aprobado"
+      ? "Pago confirmado. Preparamos el envío y te escribimos al correo del pedido."
+      : paymentsEnabled
+        ? "Guardamos los discos 48 horas mientras se completa el pago."
+        : "Guardamos los discos 48 horas. El pago todavía no está conectado, así que el pedido queda pendiente."
+
   return (
     <div className="flex flex-col items-start gap-6 border-2 border-volt p-8">
       <p className="label text-volt">Pedido {order.status}</p>
@@ -36,12 +49,7 @@ export function OrderConfirmation({ order }: { order: Order }) {
         ))}
       </ul>
 
-      <p className="text-sm text-muted">
-        Guardamos los discos 48 horas. El pago todavía no está conectado, así que el pedido queda
-        pendiente.
-      </p>
-
-      <LinkButton to="/catalogo">Seguir mirando</LinkButton>
+      <p className="text-sm text-muted">{nota}</p>
     </div>
   )
 }

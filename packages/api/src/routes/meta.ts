@@ -1,4 +1,5 @@
 import { type Request, type Response, Router } from "express"
+import { isPaymentsConfigured } from "../lib/mercadopago.js"
 import { CONDITIONS, FORMATS } from "../lib/validation.js"
 import { SHIPPING_FLAT_CLP } from "../repositories/orders.js"
 import { listGenres, listLabels } from "../repositories/releases.js"
@@ -15,5 +16,7 @@ metaRouter.get("/", async (_req: Request, res: Response) => {
     conditions: CONDITIONS,
     shippingFlatClp: SHIPPING_FLAT_CLP,
     currency: "CLP",
+    // Para que el checkout avise si el pedido va a quedar pendiente de pago.
+    paymentsEnabled: isPaymentsConfigured(),
   })
 })

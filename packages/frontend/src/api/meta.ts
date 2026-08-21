@@ -7,6 +7,7 @@ export interface CatalogMeta {
   conditions: string[]
   shippingFlatClp: number
   currency: string
+  paymentsEnabled: boolean
 }
 
 /** Los géneros y la tarifa cambian poco: una sola petición por sesión alcanza. */

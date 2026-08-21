@@ -8,6 +8,8 @@ const FALLBACK: CatalogMeta = {
   conditions: ["Nuevo", "Usado"],
   shippingFlatClp: 0,
   currency: "CLP",
+  // Sin respuesta del API se asume lo prudente: no prometer un cobro.
+  paymentsEnabled: false,
 }
 
 /** Géneros, formatos y tarifa de despacho vienen del backend; el fallback evita filtros vacíos. */

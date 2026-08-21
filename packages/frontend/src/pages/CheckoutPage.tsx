@@ -6,6 +6,7 @@ import { CartSummary } from "../components/cart/CartSummary"
 import { EmptyCart } from "../components/cart/EmptyCart"
 import { CheckoutForm } from "../components/checkout/CheckoutForm"
 import { OrderConfirmation } from "../components/checkout/OrderConfirmation"
+import { LinkButton } from "../components/ui/LinkButton"
 import { useCart } from "../hooks/useCart"
 import { useMeta } from "../hooks/useMeta"
 
@@ -65,8 +66,14 @@ export function CheckoutPage() {
         <h1 className="border-b-2 border-paper pb-4 font-display text-5xl uppercase sm:text-6xl">
           Pedido listo
         </h1>
-        <div className="mt-8 max-w-2xl">
-          <OrderConfirmation order={order} />
+        <div className="mt-8 flex max-w-2xl flex-col items-start gap-6">
+          <OrderConfirmation order={order} paymentsEnabled={meta.paymentsEnabled} />
+          {/* Con la pasarela activa sólo se cae aquí si el cobro no llegó a abrirse. */}
+          {meta.paymentsEnabled ? (
+            <LinkButton to={`/pedido/${order.id}`}>Reintentar el pago</LinkButton>
+          ) : (
+            <LinkButton to="/catalogo">Seguir mirando</LinkButton>
+          )}
         </div>
       </section>
     )
@@ -94,6 +101,7 @@ export function CheckoutPage() {
           shippingMethod={shippingMethod}
           shippingCost={meta.shippingFlatClp}
           submitting={submitting}
+          paymentsEnabled={meta.paymentsEnabled}
           error={error}
           onShippingChange={setShippingMethod}
           onSubmit={handleSubmit}

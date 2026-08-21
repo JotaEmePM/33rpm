@@ -8,6 +8,7 @@ interface CheckoutFormProps {
   shippingMethod: ShippingMethod
   shippingCost: number
   submitting: boolean
+  paymentsEnabled: boolean
   error: string | null
   onShippingChange: (method: ShippingMethod) => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
@@ -17,6 +18,7 @@ export function CheckoutForm({
   shippingMethod,
   shippingCost,
   submitting,
+  paymentsEnabled,
   error,
   onShippingChange,
   onSubmit,
@@ -63,10 +65,12 @@ export function CheckoutForm({
       ) : null}
 
       <Button type="submit" size="lg" disabled={submitting}>
-        {submitting ? "Confirmando…" : "Confirmar pedido"}
+        {submitting ? "Confirmando…" : paymentsEnabled ? "Ir a pagar" : "Confirmar pedido"}
       </Button>
       <p className="label text-muted">
-        El pedido queda pendiente de pago — falta conectar la pasarela
+        {paymentsEnabled
+          ? "El pago se completa en Mercado Pago y vuelves a la tienda al terminar"
+          : "El pedido queda pendiente de pago — falta conectar la pasarela"}
       </p>
     </form>
   )
