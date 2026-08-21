@@ -55,6 +55,28 @@ async function callMercadoPago<T>(
 }
 
 /**
+ * Con una cuenta de prueba el cobro va al dominio sandbox: el `init_point`
+ * normal lleva al Mercado Pago real, donde un usuario de prueba no puede pagar.
+ * La cuenta se consulta una vez y se recuerda; si la consulta falla se asume
+ * producción, que es lo prudente. Así basta cambiar el token para cambiar de
+ * entorno, sin una variable que se quede encendida por olvido.
+ */
+let sandboxAccount: Promise<boolean> | null = null
+
+function isSandboxAccount(): Promise<boolean> {
+  if (!sandboxAccount) {
+    sandboxAccount = callMercadoPago<{ tags?: string[] }>("/users/me")
+      .then((user) => {
+        const sandbox = user.tags?.includes("test_user") ?? false
+        logger.info({ sandbox }, `Mercado Pago: cuenta de ${sandbox ? "prueba" : "producción"}`)
+        return sandbox
+      })
+      .catch(() => false)
+  }
+  return sandboxAccount
+}
+
+/**
  * Mercado Pago no acepta `localhost` como destino de vuelta: con `auto_return`
  * activado responde 400 (`invalid_auto_return`). En desarrollo se omite y el
  * cliente vuelve pulsando el botón del comprobante, que es lo único que cambia.
@@ -69,28 +91,33 @@ function isPublicUrl(url: string): boolean {
  * para poder reconocerlo cuando llegue la notificación del pago.
  */
 export async function createPreference(request: PreferenceRequest): Promise<Preference> {
-  const created = await callMercadoPago<{ id: string; init_point: string }>(
-    "/checkout/preferences",
-    {
-      method: "POST",
-      idempotencyKey: request.orderId,
-      body: JSON.stringify({
-        items: request.items.map((item) => ({ ...item, currency_id: "CLP" })),
-        payer: { name: request.payer.name, email: request.payer.email },
-        external_reference: request.orderId,
-        notification_url: request.notificationUrl,
-        statement_descriptor: "33RPM",
-        back_urls: {
-          success: `${request.backUrl}?estado=exito`,
-          pending: `${request.backUrl}?estado=pendiente`,
-          failure: `${request.backUrl}?estado=fallo`,
-        },
-        ...(isPublicUrl(request.backUrl) ? { auto_return: "approved" } : {}),
-      }),
-    },
-  )
+  const created = await callMercadoPago<{
+    id: string
+    init_point: string
+    sandbox_init_point?: string
+  }>("/checkout/preferences", {
+    method: "POST",
+    idempotencyKey: request.orderId,
+    body: JSON.stringify({
+      items: request.items.map((item) => ({ ...item, currency_id: "CLP" })),
+      payer: { name: request.payer.name, email: request.payer.email },
+      external_reference: request.orderId,
+      notification_url: request.notificationUrl,
+      statement_descriptor: "33RPM",
+      back_urls: {
+        success: `${request.backUrl}?estado=exito`,
+        pending: `${request.backUrl}?estado=pendiente`,
+        failure: `${request.backUrl}?estado=fallo`,
+      },
+      ...(isPublicUrl(request.backUrl) ? { auto_return: "approved" } : {}),
+    }),
+  })
 
-  return { id: created.id, initPoint: created.init_point }
+  const sandbox = await isSandboxAccount()
+  return {
+    id: created.id,
+    initPoint: (sandbox ? created.sandbox_init_point : null) ?? created.init_point,
+  }
 }
 
 export interface MercadoPagoPayment {
