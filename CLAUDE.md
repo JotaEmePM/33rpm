@@ -63,6 +63,7 @@ pnpm --dir packages/frontend lint:oxlint
 - Router en modo **data router** (`router/routes.tsx` + `router/index.ts`). Catálogo y ficha cargan por *loaders*; el resto usa `useAsync` / `useReleases`.
 - Los filtros del catálogo viven en la URL (`genero`, `formato`, `estado`, `stock`, `orden`), no en estado local: así son enlazables y cada cambio es una navegación animable.
 - El buscador del header es un combobox con sugerencias: `useSearchSuggestions` retrasa la consulta 200 ms y `useAsync` cancela la anterior, así que una respuesta lenta nunca pisa a la más reciente.
+- `/api/meta` expone `paymentsEnabled` (si hay `MP_ACCESS_TOKEN`): el checkout cambia el botón a «Ir a pagar» y sólo promete el resguardo de pedido pendiente cuando de verdad no hay pasarela. `OrderConfirmation` es sólo el recibo —su aviso sale de `paymentStatus`— y cada página pone sus acciones.
 - El checkout crea el pedido, pide el cobro y **sale de la tienda** hacia Mercado Pago; se vuelve a `/pedido/:id`, que refresca solo mientras el pago esté en proceso y deja reintentar si quedó pendiente.
 - `WishlistProvider` mantiene los ids de la lista de deseos por encima del router, junto a `CartProvider`. El corazón pinta el cambio antes de que responda el servidor y lo revierte si falla; sin sesión lleva a `/login` con el destino de vuelta.
 - La ficha muestra la galería (`ReleaseGallery`): miniaturas al costado y flechas sobre la foto, sin zoom. En catálogo y buscador se usa `images[0]`, que el API garantiza que es la portada.
